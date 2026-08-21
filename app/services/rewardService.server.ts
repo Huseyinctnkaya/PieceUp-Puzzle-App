@@ -1,4 +1,5 @@
 import type { AdminApiContext } from "@shopify/shopify-app-react-router/server";
+import { randomInt } from "node:crypto";
 
 const DISCOUNT_CODE_CREATE = `#graphql
   mutation discountCodeBasicCreate($basicCodeDiscount: DiscountCodeBasicInput!) {
@@ -17,8 +18,8 @@ export type RewardConfig = {
 function randomCode(prefix: string): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let suffix = "";
-  for (let i = 0; i < 6; i++) {
-    suffix += chars[Math.floor(Math.random() * chars.length)];
+  for (let i = 0; i < 12; i++) {
+    suffix += chars[randomInt(chars.length)];
   }
   return `${prefix}-${suffix}`;
 }
@@ -53,7 +54,7 @@ export async function issueRewardCode(admin: AdminApiContext, reward: RewardConf
 
   const json = await response.json();
   const userErrors = json.data?.discountCodeBasicCreate?.userErrors ?? [];
-  if (userErrors.length > 0) {
+  if (!json.data?.discountCodeBasicCreate?.codeDiscountNode || userErrors.length > 0) {
     throw new Error(`Discount code creation failed: ${userErrors.map((e: any) => e.message).join(", ")}`);
   }
   return code;

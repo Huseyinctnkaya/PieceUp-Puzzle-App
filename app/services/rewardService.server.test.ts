@@ -18,7 +18,7 @@ describe("issueRewardCode", () => {
       rewardType: "PERCENTAGE_DISCOUNT",
       rewardValue: "10",
     });
-    expect(code).toMatch(/^PIECEUP-[A-Z0-9]{6}$/);
+    expect(code).toMatch(/^PIECEUP-[A-Z0-9]{12}$/);
   });
 
   it("throws when the mutation reports user errors", async () => {
@@ -28,6 +28,22 @@ describe("issueRewardCode", () => {
           discountCodeBasicCreate: {
             codeDiscountNode: null,
             userErrors: [{ field: "code", message: "already taken" }],
+          },
+        }),
+      ),
+    };
+    await expect(
+      issueRewardCode(admin as any, { rewardType: "PERCENTAGE_DISCOUNT", rewardValue: "10" }),
+    ).rejects.toThrow("Discount code creation failed");
+  });
+
+  it("throws when codeDiscountNode is absent (top-level GraphQL error)", async () => {
+    const admin = {
+      graphql: vi.fn().mockResolvedValue(
+        jsonResponse({
+          discountCodeBasicCreate: {
+            codeDiscountNode: null,
+            userErrors: [],
           },
         }),
       ),
