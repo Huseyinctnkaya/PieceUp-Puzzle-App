@@ -22,21 +22,26 @@ export function buildPiecePath(width, height, edges) {
   const tw = width * TAB_SIZE_RATIO;
   const th = height * TAB_SIZE_RATIO;
 
-  const top = edgeSegment(0, 0, width, 0, edges.top, th, "h");
-  const right = edgeSegment(width, 0, width, height, edges.right, tw, "v");
-  const bottom = edgeSegment(width, height, 0, height, edges.bottom, th, "h");
-  const left = edgeSegment(0, height, 0, 0, edges.left, tw, "v");
+  // Sign indicates the direction the bulge points "outward" from the piece:
+  // top (y1=0): outward is -y, so sign=1 (offset negates to point upward)
+  // right (x1=width): outward is +x, so sign=1 (offset adds to point rightward)
+  // bottom (y1=height): outward is +y, so sign=-1 (offset negates to point downward)
+  // left (x1=0): outward is -x, so sign=-1 (offset negates to point leftward)
+  const top = edgeSegment(0, 0, width, 0, edges.top, th, "h", 1);
+  const right = edgeSegment(width, 0, width, height, edges.right, tw, "v", 1);
+  const bottom = edgeSegment(width, height, 0, height, edges.bottom, th, "h", -1);
+  const left = edgeSegment(0, height, 0, 0, edges.left, tw, "v", -1);
 
   return `M 0 0 ${top} ${right} ${bottom} ${left} Z`;
 }
 
-function edgeSegment(x1, y1, x2, y2, edge, tabSize, axis) {
+function edgeSegment(x1, y1, x2, y2, edge, tabSize, axis, sign) {
   if (edge === 0) {
     return `L ${x2} ${y2}`;
   }
   const midX = (x1 + x2) / 2;
   const midY = (y1 + y2) / 2;
-  const offset = tabSize * edge;
+  const offset = tabSize * edge * sign;
   if (axis === "h") {
     return (
       `L ${midX - tabSize} ${y1} ` +
