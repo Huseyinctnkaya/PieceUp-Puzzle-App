@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useFetcher, useLoaderData } from "react-router";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
+import type { CallbackEvent } from "@shopify/polaris-types";
 import { authenticate } from "../shopify.server";
 import { getPuzzleConfig, upsertPuzzleConfig } from "../models/puzzleConfig.server";
 import type { action as uploadAction } from "./app.upload";
@@ -54,26 +55,35 @@ export default function SettingsPage() {
   const [playLimitType, setPlayLimitType] = useState(config?.playLimitType ?? "ONCE_EVER");
   const [isActive, setIsActive] = useState(config?.isActive ?? false);
 
+  // uploadFetcher.data / saveFetcher.data are only safe to `in`-check once we
+  // know they're actual objects: a non-JSON `Content-Type` on the upload
+  // route's error Response (fixed, but guarded here as defense in depth)
+  // would otherwise hand back a raw string and make `"x" in data` throw.
   useEffect(() => {
-    if (uploadFetcher.data && "imageUrl" in uploadFetcher.data) {
+    if (uploadFetcher.data && typeof uploadFetcher.data === "object" && "imageUrl" in uploadFetcher.data) {
       setImageUrl(uploadFetcher.data.imageUrl);
-    } else if (uploadFetcher.data && "error" in uploadFetcher.data) {
+    } else if (uploadFetcher.data && typeof uploadFetcher.data === "object" && "error" in uploadFetcher.data) {
       shopify.toast.show("Görsel yüklenemedi", { isError: true });
     }
   }, [uploadFetcher.data, shopify]);
 
   useEffect(() => {
-    if (saveFetcher.data && "saved" in saveFetcher.data && saveFetcher.data.saved) {
+    if (
+      saveFetcher.data &&
+      typeof saveFetcher.data === "object" &&
+      "saved" in saveFetcher.data &&
+      saveFetcher.data.saved
+    ) {
       shopify.toast.show("Ayarlar kaydedildi");
     }
   }, [saveFetcher.data, shopify]);
 
   const uploadError =
-    uploadFetcher.data && "error" in uploadFetcher.data
+    uploadFetcher.data && typeof uploadFetcher.data === "object" && "error" in uploadFetcher.data
       ? String(uploadFetcher.data.error)
       : undefined;
 
-  function handleDrop(event: { currentTarget: { files: File[] } }) {
+  function handleDrop(event: CallbackEvent<"s-drop-zone">) {
     const file = event.currentTarget.files[0];
     if (!file) return;
     const formData = new FormData();
@@ -104,23 +114,14 @@ export default function SettingsPage() {
   return (
     <s-page heading="PieceUp Ayarları">
       <s-section heading="Puzzle görseli">
-        {imageUrl ? (
-          <s-drop-zone
-            label="Puzzle görseli"
-            accept="image/jpeg,image/png,image/webp"
-            error={uploadError}
-            onChange={handleDrop}
-          >
-            <s-thumbnail src={imageUrl} alt="Puzzle görseli" size="large" />
-          </s-drop-zone>
-        ) : (
-          <s-drop-zone
-            label="Puzzle görseli"
-            accept="image/jpeg,image/png,image/webp"
-            error={uploadError}
-            onChange={handleDrop}
-          />
-        )}
+        <s-drop-zone
+          label="Puzzle görseli"
+          accept="image/jpeg,image/png,image/webp"
+          error={uploadError}
+          onChange={handleDrop}
+        >
+          {imageUrl ? <s-thumbnail src={imageUrl} alt="Puzzle görseli" size="large" /> : null}
+        </s-drop-zone>
 
         <s-select
           label="Parça sayısı"
