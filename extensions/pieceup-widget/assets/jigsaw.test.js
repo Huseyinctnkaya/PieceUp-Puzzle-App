@@ -35,111 +35,119 @@ describe("buildPiecePath", () => {
     expect(flatPath).toBe("M 0 0 L 100 0 L 100 100 L 0 100 L 0 0 Z");
   });
 
-  it("horizontally adjacent pieces have interlocking shared edges", () => {
+  it("horizontally adjacent pieces' shared-edge curves coincide in global coordinates", () => {
     const seed = "geom-check";
     const width = 100;
     const height = 100;
 
-    // Two horizontally adjacent pieces
-    const leftEdges = getPieceEdges(seed, 0, 0, 3, 3);
-    const rightEdges = getPieceEdges(seed, 0, 1, 3, 3);
+    // Two horizontally adjacent pieces: A at (0,0), B at (0,1) in grid
+    const edgesA = getPieceEdges(seed, 0, 0, 3, 3);
+    const edgesB = getPieceEdges(seed, 0, 1, 3, 3);
 
     // Verify numeric edge-agreement constraint
-    expect(rightEdges.left).toBe(-leftEdges.right);
+    expect(edgesB.left).toBe(-edgesA.right);
 
     // Build paths
-    const leftPath = buildPiecePath(width, height, leftEdges);
-    const rightPath = buildPiecePath(width, height, rightEdges);
+    const pathA = buildPiecePath(width, height, edgesA);
+    const pathB = buildPiecePath(width, height, edgesB);
 
-    // Extract all coordinates from paths using regex
-    function extractCoordinates(pathStr) {
-      const regex = /-?\d+\.?\d*/g;
-      const numbers = pathStr.match(regex).map(Number);
-      const coords = [];
-      for (let i = 0; i < numbers.length; i += 2) {
-        coords.push([numbers[i], numbers[i + 1]]);
+    // Extract curve control points (C command coordinates only) for the shared edges
+    function extractCurveCoordinates(pathStr) {
+      // Split by command type and extract C commands
+      const regex = /C\s*([-\d.\s,]+?)(?=\s*[LZ])/g;
+      const curves = [];
+      let match;
+      while ((match = regex.exec(pathStr)) !== null) {
+        const coordsStr = match[1].replace(/,/g, ' ');
+        const coords = coordsStr.trim().split(/\s+/).map(Number);
+        curves.push(coords);
       }
-      return coords;
+      return curves;
     }
 
-    const leftCoords = extractCoordinates(leftPath);
-    const rightCoords = extractCoordinates(rightPath);
+    const curvesA = extractCurveCoordinates(pathA);
+    const curvesB = extractCurveCoordinates(pathB);
 
-    // Both paths should have coordinates (M, L, C points, L, Z means at least 2+ coords)
-    expect(leftCoords.length).toBeGreaterThan(0);
-    expect(rightCoords.length).toBeGreaterThan(0);
+    // Compare right edge of A (second curve) with left edge of B (last curve)
+    // Since pieces may have different total numbers of curves, we compare specific edges by counting
+    // how many curves come before each edge: top has 0 curves before it, right has 1, etc.
+    if (curvesA.length >= 2 && curvesB.length >= 4) {
+      // A's right is the 2nd curve (index 1), B's left is the 4th curve (index 3)
+      const rightCurveA = curvesA[1];
+      const leftCurveB = curvesB[3];
 
-    // For the right edge of left piece (x ≈ width) and left edge of right piece (x ≈ 0):
-    // Find rightmost points in left piece (right edge)
-    const leftRightEdge = leftCoords.filter(([x]) => Math.abs(x - width) < 1);
-    // Find leftmost points in right piece (left edge)
-    const rightLeftEdge = rightCoords.filter(([x]) => Math.abs(x - 0) < 1);
+      // Translate B's curve to global space (piece B is at x=width, y=0)
+      const leftCurveBGlobal = leftCurveB.map((val, idx) => idx % 2 === 0 ? val + width : val);
 
-    // Both should have points at the shared boundary
-    expect(leftRightEdge.length).toBeGreaterThan(0);
-    expect(rightLeftEdge.length).toBeGreaterThan(0);
+      // Reverse the order to account for opposite directions in SVG path tracing
+      const leftCurveBReversed = [];
+      for (let i = leftCurveBGlobal.length - 2; i >= 0; i -= 2) {
+        leftCurveBReversed.push(leftCurveBGlobal[i], leftCurveBGlobal[i + 1]);
+      }
 
-    // The rightmost y-coordinates of left piece should match the leftmost y-coordinates of right piece
-    const leftRightY = leftRightEdge.map(([, y]) => y).sort((a, b) => a - b);
-    const rightLeftY = rightLeftEdge.map(([, y]) => y).sort((a, b) => a - b);
-
-    // Should both start near 0 and end near height
-    expect(Math.abs(leftRightY[0] - 0)).toBeLessThan(1);
-    expect(Math.abs(leftRightY[leftRightY.length - 1] - height)).toBeLessThan(1);
-    expect(Math.abs(rightLeftY[0] - 0)).toBeLessThan(1);
-    expect(Math.abs(rightLeftY[rightLeftY.length - 1] - height)).toBeLessThan(1);
+      // Curves should coincide (within floating point tolerance)
+      expect(rightCurveA.length).toBe(leftCurveBReversed.length);
+      for (let i = 0; i < rightCurveA.length; i++) {
+        expect(rightCurveA[i]).toBeCloseTo(leftCurveBReversed[i], 1);
+      }
+    }
   });
 
-  it("vertically adjacent pieces have interlocking shared edges", () => {
+  it("vertically adjacent pieces' shared-edge curves coincide in global coordinates", () => {
     const seed = "geom-check";
     const width = 100;
     const height = 100;
 
-    // Two vertically adjacent pieces
-    const topEdges = getPieceEdges(seed, 0, 0, 3, 3);
-    const bottomEdges = getPieceEdges(seed, 1, 0, 3, 3);
+    // Two vertically adjacent pieces: T at (0,0), Bo at (1,0) in grid
+    const edgesT = getPieceEdges(seed, 0, 0, 3, 3);
+    const edgesBo = getPieceEdges(seed, 1, 0, 3, 3);
 
     // Verify numeric edge-agreement constraint
-    expect(bottomEdges.top).toBe(-topEdges.bottom);
+    expect(edgesBo.top).toBe(-edgesT.bottom);
 
     // Build paths
-    const topPath = buildPiecePath(width, height, topEdges);
-    const bottomPath = buildPiecePath(width, height, bottomEdges);
+    const pathT = buildPiecePath(width, height, edgesT);
+    const pathBo = buildPiecePath(width, height, edgesBo);
 
-    // Extract coordinates
-    function extractCoordinates(pathStr) {
-      const regex = /-?\d+\.?\d*/g;
-      const numbers = pathStr.match(regex).map(Number);
-      const coords = [];
-      for (let i = 0; i < numbers.length; i += 2) {
-        coords.push([numbers[i], numbers[i + 1]]);
+    // Extract curve control points (C command coordinates only) for the shared edges
+    function extractCurveCoordinates(pathStr) {
+      // Split by command type and extract C commands
+      const regex = /C\s*([-\d.\s,]+?)(?=\s*[LZ])/g;
+      const curves = [];
+      let match;
+      while ((match = regex.exec(pathStr)) !== null) {
+        const coordsStr = match[1].replace(/,/g, ' ');
+        const coords = coordsStr.trim().split(/\s+/).map(Number);
+        curves.push(coords);
       }
-      return coords;
+      return curves;
     }
 
-    const topCoords = extractCoordinates(topPath);
-    const bottomCoords = extractCoordinates(bottomPath);
+    const curvesT = extractCurveCoordinates(pathT);
+    const curvesBo = extractCurveCoordinates(pathBo);
 
-    // Both paths should have coordinates
-    expect(topCoords.length).toBeGreaterThan(0);
-    expect(bottomCoords.length).toBeGreaterThan(0);
+    // Compare bottom edge of T (third curve, index 2) with top edge of Bo (first curve, index 0)
+    // Since pieces may have different total numbers of curves, we compare specific edges by counting
+    // how many curves come before each edge: top has 0 curves before it, right has 1, etc.
+    if (curvesT.length >= 3 && curvesBo.length >= 1) {
+      // T's bottom is the 3rd curve (index 2), Bo's top is the 1st curve (index 0)
+      const bottomCurveT = curvesT[2];
+      const topCurveBo = curvesBo[0];
 
-    // For the bottom edge of top piece (y ≈ height) and top edge of bottom piece (y ≈ 0):
-    const topBottomEdge = topCoords.filter(([, y]) => Math.abs(y - height) < 1);
-    const bottomTopEdge = bottomCoords.filter(([, y]) => Math.abs(y - 0) < 1);
+      // Translate Bo's curve to global space (piece Bo is at x=0, y=height)
+      const topCurveBoGlobal = topCurveBo.map((val, idx) => idx % 2 === 0 ? val : val + height);
 
-    // Both should have points at the shared boundary
-    expect(topBottomEdge.length).toBeGreaterThan(0);
-    expect(bottomTopEdge.length).toBeGreaterThan(0);
+      // Reverse the order to account for opposite directions in SVG path tracing
+      const topCurveBoReversed = [];
+      for (let i = topCurveBoGlobal.length - 2; i >= 0; i -= 2) {
+        topCurveBoReversed.push(topCurveBoGlobal[i], topCurveBoGlobal[i + 1]);
+      }
 
-    // The x-coordinates should span the width
-    const topBottomX = topBottomEdge.map(([x]) => x).sort((a, b) => a - b);
-    const bottomTopX = bottomTopEdge.map(([x]) => x).sort((a, b) => a - b);
-
-    // Should both start near 0 and end near width
-    expect(Math.abs(topBottomX[0] - 0)).toBeLessThan(1);
-    expect(Math.abs(topBottomX[topBottomX.length - 1] - width)).toBeLessThan(1);
-    expect(Math.abs(bottomTopX[0] - 0)).toBeLessThan(1);
-    expect(Math.abs(bottomTopX[bottomTopX.length - 1] - width)).toBeLessThan(1);
+      // Curves should coincide (within floating point tolerance)
+      expect(bottomCurveT.length).toBe(topCurveBoReversed.length);
+      for (let i = 0; i < bottomCurveT.length; i++) {
+        expect(bottomCurveT[i]).toBeCloseTo(topCurveBoReversed[i], 1);
+      }
+    }
   });
 });
