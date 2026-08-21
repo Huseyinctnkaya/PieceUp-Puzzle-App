@@ -434,7 +434,7 @@ git commit -m "Add PuzzleConfig and PlayRecord data access layer"
 
 **Interfaces:**
 - Consumes: an `AdminApiContext`-shaped object with a `.graphql(query, { variables })` method returning `Promise<Response>` (matches `@shopify/shopify-app-react-router/server`'s `admin` object), and a web-standard `File`.
-- Produces: `uploadPuzzleImage(admin, file: File): Promise<string>` — resolves to a public CDN image URL or throws. Used by Task 5's `app/routes/app.upload.tsx`.
+- Produces: `uploadPuzzleImage(admin, file: File): Promise<string>` — resolves to a public CDN image URL, or throws `Error("file_too_large")` / `Error("unsupported_file_type")` for validation failures (checked before any network call), or a generic `Error` for upstream failures. Used by Task 5's `app/routes/app.upload.tsx`. Validation limits: 5MB max, `image/jpeg`/`image/png`/`image/webp` only (Global Constraints).
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -500,6 +500,22 @@ describe("uploadPuzzleImage", () => {
     const file = new File(["data"], "puzzle.jpg", { type: "image/jpeg" });
     await expect(uploadPuzzleImage(admin as any, file)).rejects.toThrow("Staged upload failed");
   });
+
+  it("throws without calling the network when the file exceeds 5MB", async () => {
+    const admin = { graphql: vi.fn() };
+    const oversized = new File([new Uint8Array(6 * 1024 * 1024)], "big.jpg", {
+      type: "image/jpeg",
+    });
+    await expect(uploadPuzzleImage(admin as any, oversized)).rejects.toThrow("file_too_large");
+    expect(admin.graphql).not.toHaveBeenCalled();
+  });
+
+  it("throws without calling the network when the mime type is unsupported", async () => {
+    const admin = { graphql: vi.fn() };
+    const file = new File(["data"], "puzzle.gif", { type: "image/gif" });
+    await expect(uploadPuzzleImage(admin as any, file)).rejects.toThrow("unsupported_file_type");
+    expect(admin.graphql).not.toHaveBeenCalled();
+  });
 });
 ```
 
@@ -514,6 +530,9 @@ Create `app/services/imageUpload.server.ts`:
 
 ```ts
 import type { AdminApiContext } from "@shopify/shopify-app-react-router/server";
+
+const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
+const ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 const STAGED_UPLOADS_CREATE = `#graphql
   mutation stagedUploadsCreate($input: [StagedUploadInput!]!) {
@@ -553,6 +572,13 @@ const FILE_STATUS_QUERY = `#graphql
 `;
 
 export async function uploadPuzzleImage(admin: AdminApiContext, file: File): Promise<string> {
+  if (file.size > MAX_FILE_SIZE_BYTES) {
+    throw new Error("file_too_large");
+  }
+  if (!ALLOWED_MIME_TYPES.includes(file.type)) {
+    throw new Error("unsupported_file_type");
+  }
+
   const stagedResponse = await admin.graphql(STAGED_UPLOADS_CREATE, {
     variables: {
       input: [
@@ -653,7 +679,9 @@ export async function action({ request }: ActionFunctionArgs) {
     const imageUrl = await uploadPuzzleImage(admin, file);
     return { imageUrl };
   } catch (error) {
-    return new Response(JSON.stringify({ error: "upload_failed" }), { status: 502 });
+    const message = error instanceof Error ? error.message : "upload_failed";
+    const status = message === "file_too_large" || message === "unsupported_file_type" ? 400 : 502;
+    return new Response(JSON.stringify({ error: message }), { status });
   }
 }
 ```
