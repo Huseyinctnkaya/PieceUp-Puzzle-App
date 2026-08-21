@@ -27,7 +27,7 @@ JS/CSS + SVG (storefront), Vitest.
 - `rewardType`: `PERCENTAGE_DISCOUNT` | `FREE_PRODUCT_DISCOUNT`.
 - `triggerMode`: `BUTTON` | `AUTO` | `BOTH`. `triggerPage`: `CART` | `PRODUCT` | `ALL`.
 - `playLimitType`: `ONCE_EVER` | `ONCE_PER_DAY`.
-- Discount codes: format `PIECEUP-XXXXXX`, `usageLimit: 1`, `appliesOncePerCustomer: true`, fixed 7-day validity.
+- Discount codes: format `PIECEUP-XXXXXXXXXXXX` (12-char suffix, `crypto.randomInt`-generated for sufficient entropy — amended during Task 6's fix loop per an automated security review; originally specified as 6 chars), `usageLimit: 1`, `appliesOncePerCustomer: true`, fixed 7-day validity.
 - Drop tolerance for a correct piece placement: 30% of cell width/height.
 - Image upload limits: max 5MB, `image/jpeg` | `image/png` | `image/webp`.
 - One active `PuzzleConfig` per shop (no multi-campaign support in v1).
@@ -918,7 +918,7 @@ describe("issueRewardCode", () => {
       rewardType: "PERCENTAGE_DISCOUNT",
       rewardValue: "10",
     });
-    expect(code).toMatch(/^PIECEUP-[A-Z0-9]{6}$/);
+    expect(code).toMatch(/^PIECEUP-[A-Z0-9]{12}$/);
   });
 
   it("throws when the mutation reports user errors", async () => {
