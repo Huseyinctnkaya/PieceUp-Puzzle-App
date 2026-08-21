@@ -32,3 +32,33 @@ model Session {
   refreshToken        String?
   refreshTokenExpires DateTime?
 }
+
+model PuzzleConfig {
+  id                  String    @id @default(cuid())
+  shopDomain          String    @unique
+  imageUrl            String?
+  pieceCount          Int       @default(9)
+  rewardType          String    @default("PERCENTAGE_DISCOUNT")
+  rewardValue         String    @default("10")
+  triggerMode         String    @default("BUTTON")
+  triggerPage         String    @default("ALL")
+  triggerDelaySeconds Int?
+  playLimitType       String    @default("ONCE_EVER")
+  isActive            Boolean   @default(false)
+  startDate           DateTime?
+  endDate             DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+}
+
+model PlayRecord {
+  id           String   @id @default(cuid())
+  shopDomain   String
+  identityKey  String
+  playDate     String
+  completed    Boolean  @default(false)
+  discountCode String?
+  playedAt     DateTime @default(now())
+
+  @@unique([shopDomain, identityKey, playDate])
+}
