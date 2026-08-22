@@ -25,65 +25,106 @@ function buildPopup(root, config, alreadyPlayed, identityKey) {
   overlay.hidden = true;
   root.appendChild(overlay);
 
+  const popupBox = document.createElement("div");
+  popupBox.className = "pieceup-popup";
+  overlay.appendChild(popupBox);
+
+  const closeButton = document.createElement("button");
+  closeButton.type = "button";
+  closeButton.className = "pieceup-close";
+  closeButton.setAttribute("aria-label", "Kapat");
+  closeButton.textContent = "×";
+  closeButton.addEventListener("click", close);
+  popupBox.appendChild(closeButton);
+
+  const content = document.createElement("div");
+  content.className = "pieceup-content";
+  popupBox.appendChild(content);
+
+  function close() {
+    overlay.hidden = true;
+  }
+
   function open() {
     overlay.hidden = false;
     if (alreadyPlayed) {
-      renderMessage(overlay, "Zaten katıldın, teşekkürler!");
+      renderMessage(content, "Zaten katıldın, teşekkürler!");
     } else {
-      renderPuzzle(overlay, config, async () => {
+      renderPuzzle(content, config, async () => {
         try {
           const code = await submitCompletion(identityKey);
-          renderMessage(overlay, `Tebrikler! Kodun: ${code}`);
+          renderMessage(content, `Tebrikler! Kodun: ${code}`);
         } catch (err) {
-          renderMessage(overlay, "Ödülün oluşturulamadı, lütfen tekrar dene.");
+          renderMessage(content, "Ödülün oluşturulamadı, lütfen tekrar dene.");
         }
       });
     }
   }
 
+  // Click on the backdrop (not the popup box itself) dismisses the popup.
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) close();
+  });
+
+  // Escape key dismisses the popup whenever it's open.
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !overlay.hidden) close();
+  });
+
   function mountTriggerButton() {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "pieceup-trigger";
+    button.setAttribute("aria-label", "Bulmacayı aç");
     button.textContent = "🧩";
     button.addEventListener("click", open);
     root.appendChild(button);
   }
 
-  return { open, mountTriggerButton };
+  return { open, close, mountTriggerButton };
 }
 
-function renderMessage(overlay, text) {
-  overlay.innerHTML = "";
+function renderMessage(container, text) {
+  container.innerHTML = "";
   const message = document.createElement("div");
   message.className = "pieceup-message";
   message.textContent = text;
-  overlay.appendChild(message);
+  container.appendChild(message);
 }
 
-function renderPuzzle(overlay, config, onComplete) {
+function renderPuzzle(container, config, onComplete) {
   const rows = Math.ceil(Math.sqrt(config.pieceCount));
   const cols = Math.ceil(config.pieceCount / rows);
   const cellWidth = 100;
   const cellHeight = 100;
+  const boardWidth = cols * cellWidth;
+  const boardHeight = rows * cellHeight;
   const board = new PuzzleBoard({ rows, cols, cellWidth, cellHeight });
   const pieces = buildPieces(rows, cols, cellWidth, cellHeight, config.imageUrl);
 
-  overlay.innerHTML = "";
+  container.innerHTML = "";
   const boardEl = document.createElement("div");
   boardEl.className = "pieceup-board";
+  boardEl.style.width = `${boardWidth}px`;
+  boardEl.style.height = `${boardHeight}px`;
   boardEl.style.backgroundImage = `url(${config.imageUrl})`;
-  overlay.appendChild(boardEl);
+  boardEl.style.backgroundSize = `${boardWidth}px ${boardHeight}px`;
+  container.appendChild(boardEl);
 
   const trayEl = document.createElement("div");
   trayEl.className = "pieceup-tray";
-  overlay.appendChild(trayEl);
+  container.appendChild(trayEl);
 
   for (const piece of pieces) {
     const pieceEl = document.createElement("div");
     pieceEl.className = "pieceup-piece";
     pieceEl.style.clipPath = `path('${piece.path}')`;
     pieceEl.style.backgroundImage = `url(${config.imageUrl})`;
+    // Each piece shows the image at full size, shifted so its own cell shows
+    // through the piece's clip-path shape (otherwise every piece would show
+    // the same top-left crop of the image).
+    pieceEl.style.backgroundSize = `${boardWidth}px ${boardHeight}px`;
+    pieceEl.style.backgroundPosition = `-${piece.col * cellWidth}px -${piece.row * cellHeight}px`;
     trayEl.appendChild(pieceEl);
 
     wireDrag(pieceEl, () => {
@@ -93,6 +134,11 @@ function renderPuzzle(overlay, config, onComplete) {
       const dropY = pieceRect.top - boardRect.top + pieceRect.height / 2;
       const { correct, complete } = board.attemptDrop(piece.index, dropX, dropY);
       if (correct) {
+        // Snap to the exact target cell position rather than wherever the
+        // pointer happened to release within the tolerance zone.
+        pieceEl.style.position = "fixed";
+        pieceEl.style.left = `${boardRect.left + piece.col * cellWidth}px`;
+        pieceEl.style.top = `${boardRect.top + piece.row * cellHeight}px`;
         pieceEl.classList.add("pieceup-piece--locked");
         if (complete) onComplete();
       } else {

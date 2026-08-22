@@ -5,10 +5,17 @@ export function getIdentityKey(root) {
   if (customerId) {
     return `customer:${customerId}`;
   }
-  let deviceId = localStorage.getItem(STORAGE_KEY);
-  if (!deviceId) {
+  let deviceId;
+  try {
+    deviceId = localStorage.getItem(STORAGE_KEY);
+    if (!deviceId) {
+      deviceId = crypto.randomUUID();
+      localStorage.setItem(STORAGE_KEY, deviceId);
+    }
+  } catch (err) {
+    // localStorage can throw (e.g. Safari private mode, storage disabled).
+    // Fall back to a non-persisted id so the widget still works for this page view.
     deviceId = crypto.randomUUID();
-    localStorage.setItem(STORAGE_KEY, deviceId);
   }
   return `device:${deviceId}`;
 }
