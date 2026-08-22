@@ -8,6 +8,15 @@
   z-index: 9999;
 }
 
+/* Author rules always win over the user-agent [hidden] stylesheet rule in
+   the CSS cascade, regardless of specificity or source order, so the
+   `display: flex` above would otherwise keep the overlay visible (and
+   intercepting pointer events across the whole page) even while
+   widget.js sets overlay.hidden = true. */
+.pieceup-overlay[hidden] {
+  display: none;
+}
+
 .pieceup-popup {
   position: relative;
 }
