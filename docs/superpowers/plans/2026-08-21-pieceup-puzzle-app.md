@@ -1468,7 +1468,7 @@ import { PuzzleBoard, buildPieces } from "./puzzle.js";
 describe("PuzzleBoard.attemptDrop", () => {
   it("accepts a drop inside the tolerance of the correct cell", () => {
     const board = new PuzzleBoard({ rows: 3, cols: 3, cellWidth: 100, cellHeight: 100 });
-    const result = board.attemptDrop(4, 250, 255);
+    const result = board.attemptDrop(8, 250, 255);
     expect(result.correct).toBe(true);
   });
 
