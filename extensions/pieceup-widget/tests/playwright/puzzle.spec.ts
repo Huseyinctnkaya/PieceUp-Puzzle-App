@@ -3,8 +3,10 @@ import { test, expect } from "@playwright/test";
 // Served by the static file server configured as `webServer` in
 // playwright.config.ts (baseURL points at it), so relative fetch() calls
 // from widget.js resolve to real http(s) URLs that page.route() can
-// intercept — a file:// origin can't do either of those things.
-const fixtureUrl = "/extensions/pieceup-widget/tests/playwright/fixture.html";
+// intercept — a file:// origin can't do either of those things. That
+// server's root is extensions/pieceup-widget/ (see static-server.mjs), so
+// this path is relative to there, not the repo root.
+const fixtureUrl = "/tests/playwright/fixture.html";
 
 test("completes a 2x2 puzzle via pointer drag and shows the reward code", async ({ page }) => {
   await page.route("**/apps/pieceup/config", (route) =>
