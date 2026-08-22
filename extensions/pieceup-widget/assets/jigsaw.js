@@ -35,7 +35,7 @@ export function buildPiecePath(width, height, edges) {
   return `M 0 0 ${top} ${right} ${bottom} ${left} Z`;
 }
 
-function edgeSegment(x1, y1, x2, y2, edge, tabSize, axis, sign) {
+export function edgeSegment(x1, y1, x2, y2, edge, tabSize, axis, sign) {
   if (edge === 0) {
     return `L ${x2} ${y2}`;
   }
