@@ -7,16 +7,26 @@ beforeEach(() => {
 
 describe("fetchConfig", () => {
   it("returns the config object from the response", async () => {
-    global.fetch.mockResolvedValue({ json: async () => ({ config: { pieceCount: 9 } }) });
+    global.fetch.mockResolvedValue({ ok: true, json: async () => ({ config: { pieceCount: 9 } }) });
     const config = await fetchConfig();
     expect(config.pieceCount).toBe(9);
+  });
+
+  it("throws when the server returns a non-ok response", async () => {
+    global.fetch.mockResolvedValue({ ok: false, json: async () => ({}) });
+    await expect(fetchConfig()).rejects.toThrow("config_fetch_failed");
   });
 });
 
 describe("fetchStatus", () => {
   it("returns alreadyPlayed from the response", async () => {
-    global.fetch.mockResolvedValue({ json: async () => ({ alreadyPlayed: true }) });
+    global.fetch.mockResolvedValue({ ok: true, json: async () => ({ alreadyPlayed: true }) });
     expect(await fetchStatus("device:abc")).toBe(true);
+  });
+
+  it("throws when the server returns a non-ok response", async () => {
+    global.fetch.mockResolvedValue({ ok: false, json: async () => ({}) });
+    await expect(fetchStatus("device:abc")).rejects.toThrow("status_fetch_failed");
   });
 });
 
