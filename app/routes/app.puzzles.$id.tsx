@@ -101,6 +101,10 @@ export default function PuzzleEdit() {
     [form, baseline],
   );
 
+  // Stored as a string in the form object (everything submitted is a string),
+  // so unwrap it once here rather than comparing at each use site.
+  const isActive = form.isActive === "true";
+
   function setField<K extends keyof typeof form>(key: K, value: string) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
@@ -220,8 +224,23 @@ export default function PuzzleEdit() {
 
       <s-stack gap="large">
         <s-grid gridTemplateColumns="1fr auto" gap="base" alignItems="center">
-          <s-heading>{isNew ? "Yeni puzzle" : "Puzzle düzenle"}</s-heading>
-          <s-button href="/app/puzzles">Puzzle&apos;lara dön</s-button>
+          <s-stack direction="inline" gap="small-200" alignItems="center">
+            <s-heading>{isNew ? "Yeni puzzle" : "Puzzle düzenle"}</s-heading>
+            <s-badge tone={isActive ? "success" : "neutral"}>
+              {isActive ? "Aktif" : "Pasif"}
+            </s-badge>
+          </s-stack>
+          <s-stack direction="inline" gap="small-200" alignItems="center">
+            {/* Only flips the field — saving still goes through the save bar,
+                same as every other setting on this page. */}
+            <s-button
+              tone={isActive ? "critical" : "neutral"}
+              onClick={() => setField("isActive", String(!isActive))}
+            >
+              {isActive ? "Pasife al" : "Aktif et"}
+            </s-button>
+            <s-button href="/app/puzzles">Puzzle&apos;lara dön</s-button>
+          </s-stack>
         </s-grid>
 
         <s-grid gridTemplateColumns="1fr 1fr" gap="base">
@@ -356,14 +375,6 @@ export default function PuzzleEdit() {
                 <s-option value="ONCE_EVER">Kişi başı bir kez</s-option>
                 <s-option value="ONCE_PER_DAY">Günde bir kez</s-option>
               </s-select>
-
-              <s-checkbox
-                label="Aktif"
-                checked={form.isActive === "true"}
-                onChange={(event) =>
-                  setField("isActive", String(event.currentTarget.checked))
-                }
-              ></s-checkbox>
             </s-section>
           </s-grid-item>
 
