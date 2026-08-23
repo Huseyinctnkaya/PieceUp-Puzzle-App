@@ -1,13 +1,12 @@
-// The preview deliberately imports the storefront widget's own geometry
-// module rather than reimplementing the piece math here. If the two ever
-// drift, the preview would start lying about what merchants' customers
-// actually see — which is the one thing a preview must never do.
-import { buildPieces } from "../../extensions/pieceup-widget/assets/puzzle.js";
+import { useEffect } from "react";
+import { useFetcher } from "react-router";
+import type { loader as previewLoader } from "../routes/app.puzzle-preview";
 
-type Piece = { index: number; row: number; col: number; path: string };
-
-const CELL = 72;
-
+// The piece geometry is fetched from /app/puzzle-preview rather than computed
+// here, because the module that knows the math lives in the theme extension
+// and can only be imported server-side (see that route for why). Fetching it
+// keeps exactly one copy of the piece math in the codebase: if this preview is
+// ever wrong, it's because the storefront is wrong too.
 export function PuzzlePreview({
   imageUrl,
   pieceCount,
@@ -15,6 +14,18 @@ export function PuzzlePreview({
   imageUrl: string;
   pieceCount: number;
 }) {
+  const geometry = useFetcher<typeof previewLoader>();
+  const { load } = geometry;
+
+  useEffect(() => {
+    if (!imageUrl) return;
+    const params = new URLSearchParams({
+      pieceCount: String(pieceCount),
+      seed: imageUrl,
+    });
+    load(`/app/puzzle-preview?${params}`);
+  }, [imageUrl, pieceCount, load]);
+
   if (!imageUrl) {
     return (
       <s-box
@@ -33,14 +44,22 @@ export function PuzzlePreview({
     );
   }
 
-  // Mirrors widget.js's renderPuzzle: the grid is derived from pieceCount the
-  // same way, so a 6-piece puzzle previews as 3x2 exactly like it will on the
-  // storefront.
-  const rows = Math.ceil(Math.sqrt(pieceCount));
-  const cols = Math.ceil(pieceCount / rows);
-  const boardWidth = cols * CELL;
-  const boardHeight = rows * CELL;
-  const pieces: Piece[] = buildPieces(rows, cols, CELL, CELL, imageUrl);
+  if (!geometry.data) {
+    return (
+      <s-box
+        padding="large"
+        background="subdued"
+        borderRadius="base"
+        border="base"
+      >
+        <s-stack gap="small-200" alignItems="center">
+          <s-spinner size="base" accessibilityLabel="Önizleme yükleniyor" />
+        </s-stack>
+      </s-box>
+    );
+  }
+
+  const { pieces, cell, boardWidth, boardHeight } = geometry.data;
 
   return (
     <s-box
@@ -68,19 +87,19 @@ export function PuzzlePreview({
               display: "flex",
               flexWrap: "wrap",
               gap: 6,
-              width: CELL * 2 + 6,
+              width: cell * 2 + 6,
             }}
           >
             {pieces.map((piece) => (
               <div
                 key={piece.index}
                 style={{
-                  width: CELL,
-                  height: CELL,
+                  width: cell,
+                  height: cell,
                   clipPath: `path('${piece.path}')`,
                   backgroundImage: `url(${imageUrl})`,
                   backgroundSize: `${boardWidth}px ${boardHeight}px`,
-                  backgroundPosition: `-${piece.col * CELL}px -${piece.row * CELL}px`,
+                  backgroundPosition: `-${piece.col * cell}px -${piece.row * cell}px`,
                 }}
               />
             ))}

@@ -45,11 +45,7 @@ export default defineConfig({
     hmr: hmrConfig,
     fs: {
       // See https://vitejs.dev/config/server-options.html#server-fs-allow for more information
-      // "extensions" is allowed so the admin's puzzle preview can import the
-      // storefront widget's real geometry modules (jigsaw.js / puzzle.js)
-      // instead of reimplementing the piece math — the preview stays honest
-      // because it runs the same code the storefront does.
-      allow: ["app", "node_modules", "extensions"],
+      allow: ["app", "node_modules"],
     },
   },
   plugins: [
