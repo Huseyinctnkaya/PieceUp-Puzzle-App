@@ -70,6 +70,39 @@ function Collapsible({
   );
 }
 
+// A card that fills its grid row so the row's tallest card sets the height and
+// every action button lands on the same baseline. Built on s-box because
+// s-section exposes no sizing prop to stretch with.
+function ActionCard({
+  heading,
+  body,
+  action,
+}: {
+  heading: string;
+  body: string;
+  action: React.ReactNode;
+}) {
+  return (
+    <s-grid-item>
+      <s-box
+        padding="base"
+        background="base"
+        border="base"
+        borderRadius="base"
+        blockSize="100%"
+      >
+        <s-stack gap="base" blockSize="100%" justifyContent="space-between">
+          <s-stack gap="small-200">
+            <s-heading>{heading}</s-heading>
+            <s-text color="subdued">{body}</s-text>
+          </s-stack>
+          {action}
+        </s-stack>
+      </s-box>
+    </s-grid-item>
+  );
+}
+
 export default function Dashboard() {
   const { hasPuzzle, hasActivePuzzle, themeEmbedDone, themeEditorUrl } =
     useLoaderData<typeof loader>();
@@ -231,63 +264,50 @@ export default function Dashboard() {
           gap="base"
           alignItems="stretch"
         >
-          <s-grid-item>
-            <s-section heading="Puzzle'lar">
-              <s-stack
-                gap="base"
-                blockSize="100%"
-                justifyContent="space-between"
-              >
-                <s-text color="subdued">
-                  Tüm puzzle&apos;larınızı görüntüleyin, düzenleyin ve yönetin.
-                </s-text>
-                <s-button href="/app/puzzles">
-                  Puzzle&apos;ları görüntüle
-                </s-button>
-              </s-stack>
-            </s-section>
-          </s-grid-item>
+          {/* s-box rather than s-section: a section exposes no sizing prop
+              (only heading/padding/accessibilityLabel), so it can't be told to
+              fill the stretched grid item — the cards stayed as tall as their
+              own copy and the buttons never lined up. */}
+          <ActionCard
+            heading="Puzzle'lar"
+            body="Tüm puzzle'larınızı görüntüleyin, düzenleyin ve yönetin."
+            action={
+              <s-button href="/app/puzzles">
+                Puzzle&apos;ları görüntüle
+              </s-button>
+            }
+          />
 
-          <s-grid-item>
-            <s-section heading="Yeni puzzle">
-              <s-stack
-                gap="base"
-                blockSize="100%"
-                justifyContent="space-between"
-              >
-                <s-text color="subdued">
-                  Görsel yükleyip yeni bir puzzle kampanyası oluşturun.
-                </s-text>
-                <s-button variant="primary" href="/app/puzzles/new">
-                  Puzzle oluştur
-                </s-button>
-              </s-stack>
-            </s-section>
-          </s-grid-item>
+          <ActionCard
+            heading="Yeni puzzle"
+            body="Görsel yükleyip yeni bir puzzle kampanyası oluşturun."
+            action={
+              <s-button variant="primary" href="/app/puzzles/new">
+                Puzzle oluştur
+              </s-button>
+            }
+          />
 
-          <s-grid-item>
-            <s-section heading="Mağaza widget'ı">
-              <s-stack
-                gap="base"
-                blockSize="100%"
-                justifyContent="space-between"
-              >
-                <s-text color="subdued">
-                  Puzzle&apos;ın mağazanızda görünmesi için tema
-                  düzenleyicisinden app embed&apos;ini etkinleştirin.
-                </s-text>
-                <s-button href={themeEditorUrl} target="_blank">
-                  Tema düzenleyiciyi aç
-                </s-button>
-              </s-stack>
-            </s-section>
-          </s-grid-item>
+          <ActionCard
+            heading="Mağaza widget'ı"
+            body="Puzzle'ın mağazanızda görünmesi için tema düzenleyicisinden app embed'ini etkinleştirin."
+            action={
+              <s-button href={themeEditorUrl} target="_blank">
+                Tema düzenleyiciyi aç
+              </s-button>
+            }
+          />
         </s-grid>
 
         <s-section heading="Yardıma mı ihtiyacınız var?">
-          <s-grid gridTemplateColumns="1fr 1fr" gap="base">
+          <s-grid gridTemplateColumns="1fr 1fr" gap="base" alignItems="stretch">
             <s-grid-item>
-              <s-box border="base" borderRadius="base" padding="base">
+              <s-box
+                border="base"
+                borderRadius="base"
+                padding="base"
+                blockSize="100%"
+              >
                 <s-stack gap="small-200">
                   <s-stack
                     direction="inline"
@@ -308,7 +328,12 @@ export default function Dashboard() {
             </s-grid-item>
 
             <s-grid-item>
-              <s-box border="base" borderRadius="base" padding="base">
+              <s-box
+                border="base"
+                borderRadius="base"
+                padding="base"
+                blockSize="100%"
+              >
                 <s-stack gap="small-200">
                   <s-stack
                     direction="inline"
