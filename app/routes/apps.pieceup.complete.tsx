@@ -1,8 +1,13 @@
 import type { ActionFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import { getActivePuzzleConfig } from "../models/puzzleConfig.server";
-import { hasAlreadyPlayed, recordCompletion } from "../models/playRecord.server";
+import {
+  countRewardsThisMonth,
+  hasAlreadyPlayed,
+  recordCompletion,
+} from "../models/playRecord.server";
 import { issueRewardCode } from "../services/rewardService.server";
+import { getSubscription } from "../services/billing.server";
 
 export async function action({ request }: ActionFunctionArgs) {
   if (request.method !== "POST") {
@@ -46,10 +51,25 @@ export async function action({ request }: ActionFunctionArgs) {
     });
   }
 
+  // Checked before issuing, not after: issueRewardCode creates a real,
+  // redeemable Shopify discount, so going over the plan's allowance has to be
+  // stopped before money is on the line.
+  const { plan } = await getSubscription(admin);
+  if (plan.monthlyRewardLimit !== null) {
+    const used = await countRewardsThisMonth(session.shop);
+    if (used >= plan.monthlyRewardLimit) {
+      return new Response(JSON.stringify({ error: "reward_limit_reached" }), {
+        status: 402,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+  }
+
   let code: string;
   try {
     code = await issueRewardCode(admin, {
-      rewardType: config.rewardType as "PERCENTAGE_DISCOUNT" | "FREE_PRODUCT_DISCOUNT",
+      rewardType: config.rewardType as
+        "PERCENTAGE_DISCOUNT" | "FREE_PRODUCT_DISCOUNT",
       rewardValue: config.rewardValue,
     });
   } catch (error) {

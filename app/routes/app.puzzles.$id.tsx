@@ -8,8 +8,10 @@ import {
   AlreadyActiveError,
   createPuzzleConfig,
   getPuzzleConfigById,
+  PuzzleLimitReachedError,
   updatePuzzleConfig,
 } from "../models/puzzleConfig.server";
+import { getSubscription } from "../services/billing.server";
 import type { action as uploadAction } from "./app.upload";
 import { PuzzlePreview } from "../components/PuzzlePreview";
 
@@ -26,7 +28,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 }
 
 export async function action({ request, params }: ActionFunctionArgs) {
-  const { session } = await authenticate.admin(request);
+  const { session, admin } = await authenticate.admin(request);
   const form = await request.formData();
   const isNew = params.id === "new";
 
@@ -52,13 +54,20 @@ export async function action({ request, params }: ActionFunctionArgs) {
   };
 
   try {
-    const saved = isNew
-      ? await createPuzzleConfig(session.shop, input)
-      : await updatePuzzleConfig(session.shop, params.id!, input);
+    let saved;
+    if (isNew) {
+      const { plan } = await getSubscription(admin);
+      saved = await createPuzzleConfig(session.shop, input, plan.puzzleLimit);
+    } else {
+      saved = await updatePuzzleConfig(session.shop, params.id!, input);
+    }
     return { saved: true, id: saved.id };
   } catch (error) {
     if (error instanceof AlreadyActiveError) {
       return { error: "already_active", activeName: error.activeName };
+    }
+    if (error instanceof PuzzleLimitReachedError) {
+      return { error: "puzzle_limit_reached", limit: error.limit };
     }
     return { error: "save_failed" };
   }
@@ -137,6 +146,11 @@ export default function PuzzleEdit() {
       if (saveFetcher.data.error === "already_active") {
         shopify.toast.show(
           `Zaten aktif bir puzzle'ınız var: ${saveFetcher.data.activeName}. Önce onu pasife alın.`,
+          { isError: true },
+        );
+      } else if (saveFetcher.data.error === "puzzle_limit_reached") {
+        shopify.toast.show(
+          `Planınız ${saveFetcher.data.limit} puzzle ile sınırlı. Daha fazlası için planınızı yükseltin.`,
           { isError: true },
         );
       } else {

@@ -55,6 +55,15 @@ function buildPopup(root, config, alreadyPlayed, identityKey) {
           const code = await submitCompletion(identityKey);
           renderMessage(content, `Tebrikler! Kodun: ${code}`);
         } catch (err) {
+          // The shop hit its plan's monthly reward allowance. That's not the
+          // shopper's fault and retrying won't help, so don't tell them to.
+          if (err && err.message === "reward_limit_reached") {
+            renderMessage(
+              content,
+              "Bu kampanyanın ödülleri şimdilik tükendi. Daha sonra tekrar dene!",
+            );
+            return;
+          }
           renderMessage(content, "Ödülün oluşturulamadı, lütfen tekrar dene.");
         }
       });

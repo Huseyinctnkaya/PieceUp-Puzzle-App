@@ -21,8 +21,31 @@ export async function hasAlreadyPlayed(
     });
     return record !== null;
   }
-  const record = await db.playRecord.findFirst({ where: { shopDomain, identityKey } });
+  const record = await db.playRecord.findFirst({
+    where: { shopDomain, identityKey },
+  });
   return record !== null;
+}
+
+/**
+ * Rewards handed out this calendar month, used to enforce the plan's monthly
+ * allowance. Counts rows that actually carry a discount code, so a play that
+ * failed before a code was issued doesn't burn the merchant's quota.
+ */
+export async function countRewardsThisMonth(
+  shopDomain: string,
+): Promise<number> {
+  const now = new Date();
+  const monthStart = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1),
+  );
+  return db.playRecord.count({
+    where: {
+      shopDomain,
+      discountCode: { not: null },
+      playedAt: { gte: monthStart },
+    },
+  });
 }
 
 export async function recordCompletion(

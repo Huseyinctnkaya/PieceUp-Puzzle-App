@@ -31,6 +31,7 @@ let getActivePuzzleConfig: typeof import("./puzzleConfig.server").getActivePuzzl
 let AlreadyActiveError: typeof import("./puzzleConfig.server").AlreadyActiveError;
 let PuzzleIsActiveError: typeof import("./puzzleConfig.server").PuzzleIsActiveError;
 let NotFoundError: typeof import("./puzzleConfig.server").NotFoundError;
+let PuzzleLimitReachedError: typeof import("./puzzleConfig.server").PuzzleLimitReachedError;
 
 beforeAll(async () => {
   execSync("npx prisma db push --skip-generate", { stdio: "inherit" });
@@ -45,6 +46,7 @@ beforeAll(async () => {
     AlreadyActiveError,
     PuzzleIsActiveError,
     NotFoundError,
+    PuzzleLimitReachedError,
   } = await import("./puzzleConfig.server"));
 });
 
@@ -73,8 +75,16 @@ const baseInput = {
 
 describe("createPuzzleConfig / listPuzzleConfigs / getPuzzleConfigById", () => {
   it("creates multiple puzzles for the same shop and lists them all", async () => {
-    await createPuzzleConfig("shop-a.myshopify.com", { ...baseInput, name: "A", isActive: false });
-    await createPuzzleConfig("shop-a.myshopify.com", { ...baseInput, name: "B", isActive: false });
+    await createPuzzleConfig("shop-a.myshopify.com", {
+      ...baseInput,
+      name: "A",
+      isActive: false,
+    });
+    await createPuzzleConfig("shop-a.myshopify.com", {
+      ...baseInput,
+      name: "B",
+      isActive: false,
+    });
     const list = await listPuzzleConfigs("shop-a.myshopify.com");
     expect(list).toHaveLength(2);
     expect(list.map((p) => p.name).sort()).toEqual(["A", "B"]);
@@ -85,8 +95,12 @@ describe("createPuzzleConfig / listPuzzleConfigs / getPuzzleConfigById", () => {
       ...baseInput,
       isActive: false,
     });
-    expect(await getPuzzleConfigById("shop-a.myshopify.com", created.id)).not.toBeNull();
-    expect(await getPuzzleConfigById("shop-other.myshopify.com", created.id)).toBeNull();
+    expect(
+      await getPuzzleConfigById("shop-a.myshopify.com", created.id),
+    ).not.toBeNull();
+    expect(
+      await getPuzzleConfigById("shop-other.myshopify.com", created.id),
+    ).toBeNull();
   });
 });
 
@@ -100,31 +114,54 @@ describe("activation guard", () => {
   });
 
   it("rejects creating a second active puzzle while one is already active", async () => {
-    await createPuzzleConfig("shop-c.myshopify.com", { ...baseInput, name: "First", isActive: true });
+    await createPuzzleConfig("shop-c.myshopify.com", {
+      ...baseInput,
+      name: "First",
+      isActive: true,
+    });
     await expect(
-      createPuzzleConfig("shop-c.myshopify.com", { ...baseInput, name: "Second", isActive: true }),
+      createPuzzleConfig("shop-c.myshopify.com", {
+        ...baseInput,
+        name: "Second",
+        isActive: true,
+      }),
     ).rejects.toThrow(AlreadyActiveError);
   });
 
   it("rejects activating an existing inactive puzzle while another is active", async () => {
-    await createPuzzleConfig("shop-d.myshopify.com", { ...baseInput, name: "First", isActive: true });
+    await createPuzzleConfig("shop-d.myshopify.com", {
+      ...baseInput,
+      name: "First",
+      isActive: true,
+    });
     const second = await createPuzzleConfig("shop-d.myshopify.com", {
       ...baseInput,
       name: "Second",
       isActive: false,
     });
     await expect(
-      updatePuzzleConfig("shop-d.myshopify.com", second.id, { ...baseInput, name: "Second", isActive: true }),
+      updatePuzzleConfig("shop-d.myshopify.com", second.id, {
+        ...baseInput,
+        name: "Second",
+        isActive: true,
+      }),
     ).rejects.toThrow(AlreadyActiveError);
   });
 
   it("allows re-saving the currently active puzzle without tripping its own guard", async () => {
-    const created = await createPuzzleConfig("shop-e.myshopify.com", { ...baseInput, isActive: true });
-    const updated = await updatePuzzleConfig("shop-e.myshopify.com", created.id, {
+    const created = await createPuzzleConfig("shop-e.myshopify.com", {
       ...baseInput,
-      pieceCount: 16,
       isActive: true,
     });
+    const updated = await updatePuzzleConfig(
+      "shop-e.myshopify.com",
+      created.id,
+      {
+        ...baseInput,
+        pieceCount: 16,
+        isActive: true,
+      },
+    );
     expect(updated.pieceCount).toBe(16);
     expect(updated.isActive).toBe(true);
   });
@@ -140,13 +177,68 @@ describe("activation guard", () => {
       name: "Second",
       isActive: false,
     });
-    await updatePuzzleConfig("shop-f.myshopify.com", first.id, { ...baseInput, name: "First", isActive: false });
-    const activated = await updatePuzzleConfig("shop-f.myshopify.com", second.id, {
+    await updatePuzzleConfig("shop-f.myshopify.com", first.id, {
       ...baseInput,
-      name: "Second",
-      isActive: true,
+      name: "First",
+      isActive: false,
     });
+    const activated = await updatePuzzleConfig(
+      "shop-f.myshopify.com",
+      second.id,
+      {
+        ...baseInput,
+        name: "Second",
+        isActive: true,
+      },
+    );
     expect(activated.isActive).toBe(true);
+  });
+});
+
+describe("plan puzzle limit", () => {
+  it("refuses to create beyond the limit the caller passes in", async () => {
+    await createPuzzleConfig(
+      "shop-limit.myshopify.com",
+      { ...baseInput, name: "First", isActive: false },
+      1,
+    );
+    await expect(
+      createPuzzleConfig(
+        "shop-limit.myshopify.com",
+        { ...baseInput, name: "Second", isActive: false },
+        1,
+      ),
+    ).rejects.toThrow(PuzzleLimitReachedError);
+    expect(await listPuzzleConfigs("shop-limit.myshopify.com")).toHaveLength(1);
+  });
+
+  it("does not cap creation when no limit is given", async () => {
+    for (const name of ["A", "B", "C"]) {
+      await createPuzzleConfig("shop-unmetered.myshopify.com", {
+        ...baseInput,
+        name,
+        isActive: false,
+      });
+    }
+    expect(
+      await listPuzzleConfigs("shop-unmetered.myshopify.com"),
+    ).toHaveLength(3);
+  });
+
+  it("counts only the caller's own shop toward the limit", async () => {
+    await createPuzzleConfig(
+      "shop-mine.myshopify.com",
+      { ...baseInput, isActive: false },
+      1,
+    );
+    // A different shop being at its limit must not block this one.
+    await expect(
+      createPuzzleConfig(
+        "shop-theirs.myshopify.com",
+        { ...baseInput, isActive: false },
+        1,
+      ),
+    ).resolves.toBeTruthy();
   });
 });
 
@@ -164,7 +256,10 @@ describe("cross-tenant protection", () => {
       }),
     ).rejects.toThrow(NotFoundError);
     // The row must be completely untouched — not partially written before failing.
-    const stillOwned = await getPuzzleConfigById("shop-victim.myshopify.com", created.id);
+    const stillOwned = await getPuzzleConfigById(
+      "shop-victim.myshopify.com",
+      created.id,
+    );
     expect(stillOwned?.name).toBe("Victim's puzzle");
   });
 
@@ -176,7 +271,9 @@ describe("cross-tenant protection", () => {
     await expect(
       deletePuzzleConfig("shop-attacker2.myshopify.com", created.id),
     ).rejects.toThrow(NotFoundError);
-    expect(await getPuzzleConfigById("shop-victim2.myshopify.com", created.id)).not.toBeNull();
+    expect(
+      await getPuzzleConfigById("shop-victim2.myshopify.com", created.id),
+    ).not.toBeNull();
   });
 });
 
@@ -187,7 +284,9 @@ describe("deletePuzzleConfig", () => {
       isActive: false,
     });
     await deletePuzzleConfig("shop-g.myshopify.com", created.id);
-    expect(await getPuzzleConfigById("shop-g.myshopify.com", created.id)).toBeNull();
+    expect(
+      await getPuzzleConfigById("shop-g.myshopify.com", created.id),
+    ).toBeNull();
   });
 
   it("refuses to delete an active puzzle", async () => {
@@ -195,28 +294,45 @@ describe("deletePuzzleConfig", () => {
       ...baseInput,
       isActive: true,
     });
-    await expect(deletePuzzleConfig("shop-h.myshopify.com", created.id)).rejects.toThrow(
-      PuzzleIsActiveError,
-    );
-    expect(await getPuzzleConfigById("shop-h.myshopify.com", created.id)).not.toBeNull();
+    await expect(
+      deletePuzzleConfig("shop-h.myshopify.com", created.id),
+    ).rejects.toThrow(PuzzleIsActiveError);
+    expect(
+      await getPuzzleConfigById("shop-h.myshopify.com", created.id),
+    ).not.toBeNull();
   });
 });
 
 describe("getActivePuzzleConfig", () => {
   it("returns null when no puzzle is active", async () => {
-    await createPuzzleConfig("shop-i.myshopify.com", { ...baseInput, isActive: false });
+    await createPuzzleConfig("shop-i.myshopify.com", {
+      ...baseInput,
+      isActive: false,
+    });
     expect(await getActivePuzzleConfig("shop-i.myshopify.com")).toBeNull();
   });
 
   it("returns null when the active puzzle's startDate is in the future", async () => {
     const future = new Date(Date.now() + 86400000);
-    await createPuzzleConfig("shop-j.myshopify.com", { ...baseInput, isActive: true, startDate: future });
+    await createPuzzleConfig("shop-j.myshopify.com", {
+      ...baseInput,
+      isActive: true,
+      startDate: future,
+    });
     expect(await getActivePuzzleConfig("shop-j.myshopify.com")).toBeNull();
   });
 
   it("returns the active puzzle when within date range, ignoring inactive ones", async () => {
-    await createPuzzleConfig("shop-k.myshopify.com", { ...baseInput, name: "Inactive", isActive: false });
-    await createPuzzleConfig("shop-k.myshopify.com", { ...baseInput, name: "Active", isActive: true });
+    await createPuzzleConfig("shop-k.myshopify.com", {
+      ...baseInput,
+      name: "Inactive",
+      isActive: false,
+    });
+    await createPuzzleConfig("shop-k.myshopify.com", {
+      ...baseInput,
+      name: "Active",
+      isActive: true,
+    });
     const config = await getActivePuzzleConfig("shop-k.myshopify.com");
     expect(config?.name).toBe("Active");
   });

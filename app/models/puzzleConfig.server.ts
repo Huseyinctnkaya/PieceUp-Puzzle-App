@@ -33,6 +33,12 @@ export class NotFoundError extends Error {
   }
 }
 
+export class PuzzleLimitReachedError extends Error {
+  constructor(public readonly limit: number) {
+    super(`puzzle_limit_reached:${limit}`);
+  }
+}
+
 async function assertCanActivate(shopDomain: string, excludeId?: string) {
   const other = await db.puzzleConfig.findFirst({
     where: {
@@ -57,7 +63,19 @@ export async function getPuzzleConfigById(shopDomain: string, id: string) {
   return db.puzzleConfig.findFirst({ where: { id, shopDomain } });
 }
 
-export async function createPuzzleConfig(shopDomain: string, input: PuzzleConfigInput) {
+export async function createPuzzleConfig(
+  shopDomain: string,
+  input: PuzzleConfigInput,
+  // null means the caller's plan doesn't cap puzzle count. Passed in rather
+  // than looked up here so this module stays free of billing concerns.
+  puzzleLimit: number | null = null,
+) {
+  if (puzzleLimit !== null) {
+    const existing = await db.puzzleConfig.count({ where: { shopDomain } });
+    if (existing >= puzzleLimit) {
+      throw new PuzzleLimitReachedError(puzzleLimit);
+    }
+  }
   if (input.isActive) {
     await assertCanActivate(shopDomain);
   }
@@ -73,7 +91,9 @@ export async function updatePuzzleConfig(
   // before any write, so a caller can never mutate another shop's row by
   // guessing/reusing an id — the update below is only reachable once
   // ownership is confirmed.
-  const existing = await db.puzzleConfig.findFirst({ where: { id, shopDomain } });
+  const existing = await db.puzzleConfig.findFirst({
+    where: { id, shopDomain },
+  });
   if (!existing) {
     throw new NotFoundError();
   }
@@ -95,7 +115,9 @@ export async function deletePuzzleConfig(shopDomain: string, id: string) {
 }
 
 export async function getActivePuzzleConfig(shopDomain: string) {
-  const config = await db.puzzleConfig.findFirst({ where: { shopDomain, isActive: true } });
+  const config = await db.puzzleConfig.findFirst({
+    where: { shopDomain, isActive: true },
+  });
   if (!config) return null;
   const now = new Date();
   if (config.startDate && now < config.startDate) return null;

@@ -2,6 +2,11 @@
 
 client_id = "ee454c5e5eea80753c6628ab330db822"
 name = "PieceUp"
+# Set explicitly rather than left to Shopify's auto-generated value, because
+# the managed-pricing page lives at
+# admin.shopify.com/store/<shop>/charges/<handle>/pricing_plans — the plan page
+# builds that URL, so the handle has to be something we know, not guess.
+handle = "pieceup"
 application_url = "https://example.com"
 embedded = true
 
