@@ -27,6 +27,12 @@ export class PuzzleIsActiveError extends Error {
   }
 }
 
+export class NotFoundError extends Error {
+  constructor() {
+    super("not_found");
+  }
+}
+
 async function assertCanActivate(shopDomain: string, excludeId?: string) {
   const other = await db.puzzleConfig.findFirst({
     where: {
@@ -63,6 +69,14 @@ export async function updatePuzzleConfig(
   id: string,
   input: PuzzleConfigInput,
 ) {
+  // Scoped lookup first: confirms `id` actually belongs to `shopDomain`
+  // before any write, so a caller can never mutate another shop's row by
+  // guessing/reusing an id — the update below is only reachable once
+  // ownership is confirmed.
+  const existing = await db.puzzleConfig.findFirst({ where: { id, shopDomain } });
+  if (!existing) {
+    throw new NotFoundError();
+  }
   if (input.isActive) {
     await assertCanActivate(shopDomain, id);
   }
@@ -71,7 +85,10 @@ export async function updatePuzzleConfig(
 
 export async function deletePuzzleConfig(shopDomain: string, id: string) {
   const config = await getPuzzleConfigById(shopDomain, id);
-  if (config?.isActive) {
+  if (!config) {
+    throw new NotFoundError();
+  }
+  if (config.isActive) {
     throw new PuzzleIsActiveError();
   }
   await db.puzzleConfig.delete({ where: { id } });

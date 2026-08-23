@@ -30,6 +30,7 @@ let deletePuzzleConfig: typeof import("./puzzleConfig.server").deletePuzzleConfi
 let getActivePuzzleConfig: typeof import("./puzzleConfig.server").getActivePuzzleConfig;
 let AlreadyActiveError: typeof import("./puzzleConfig.server").AlreadyActiveError;
 let PuzzleIsActiveError: typeof import("./puzzleConfig.server").PuzzleIsActiveError;
+let NotFoundError: typeof import("./puzzleConfig.server").NotFoundError;
 
 beforeAll(async () => {
   execSync("npx prisma db push --skip-generate", { stdio: "inherit" });
@@ -43,6 +44,7 @@ beforeAll(async () => {
     getActivePuzzleConfig,
     AlreadyActiveError,
     PuzzleIsActiveError,
+    NotFoundError,
   } = await import("./puzzleConfig.server"));
 });
 
@@ -145,6 +147,36 @@ describe("activation guard", () => {
       isActive: true,
     });
     expect(activated.isActive).toBe(true);
+  });
+});
+
+describe("cross-tenant protection", () => {
+  it("refuses to update a puzzle belonging to a different shop", async () => {
+    const created = await createPuzzleConfig("shop-victim.myshopify.com", {
+      ...baseInput,
+      name: "Victim's puzzle",
+      isActive: false,
+    });
+    await expect(
+      updatePuzzleConfig("shop-attacker.myshopify.com", created.id, {
+        ...baseInput,
+        name: "Hijacked",
+      }),
+    ).rejects.toThrow(NotFoundError);
+    // The row must be completely untouched — not partially written before failing.
+    const stillOwned = await getPuzzleConfigById("shop-victim.myshopify.com", created.id);
+    expect(stillOwned?.name).toBe("Victim's puzzle");
+  });
+
+  it("refuses to delete a puzzle belonging to a different shop", async () => {
+    const created = await createPuzzleConfig("shop-victim2.myshopify.com", {
+      ...baseInput,
+      isActive: false,
+    });
+    await expect(
+      deletePuzzleConfig("shop-attacker2.myshopify.com", created.id),
+    ).rejects.toThrow(NotFoundError);
+    expect(await getPuzzleConfigById("shop-victim2.myshopify.com", created.id)).not.toBeNull();
   });
 });
 
