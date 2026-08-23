@@ -15,7 +15,9 @@ import type { action as uploadAction } from "./app.upload";
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { session } = await authenticate.admin(request);
   const isNew = params.id === "new";
-  const config = isNew ? null : await getPuzzleConfigById(session.shop, params.id!);
+  const config = isNew
+    ? null
+    : await getPuzzleConfigById(session.shop, params.id!);
   if (!isNew && !config) {
     throw new Response("Not Found", { status: 404 });
   }
@@ -32,17 +34,17 @@ export async function action({ request, params }: ActionFunctionArgs) {
     imageUrl: String(form.get("imageUrl") || ""),
     pieceCount: Number(form.get("pieceCount") || 9),
     rewardType: String(form.get("rewardType") || "PERCENTAGE_DISCOUNT") as
-      | "PERCENTAGE_DISCOUNT"
-      | "FREE_PRODUCT_DISCOUNT",
+      "PERCENTAGE_DISCOUNT" | "FREE_PRODUCT_DISCOUNT",
     rewardValue: String(form.get("rewardValue") || "10"),
-    triggerMode: String(form.get("triggerMode") || "BUTTON") as "BUTTON" | "AUTO" | "BOTH",
-    triggerPage: String(form.get("triggerPage") || "ALL") as "CART" | "PRODUCT" | "ALL",
+    triggerMode: String(form.get("triggerMode") || "BUTTON") as
+      "BUTTON" | "AUTO" | "BOTH",
+    triggerPage: String(form.get("triggerPage") || "ALL") as
+      "CART" | "PRODUCT" | "ALL",
     triggerDelaySeconds: form.get("triggerDelaySeconds")
       ? Number(form.get("triggerDelaySeconds"))
       : null,
     playLimitType: String(form.get("playLimitType") || "ONCE_EVER") as
-      | "ONCE_EVER"
-      | "ONCE_PER_DAY",
+      "ONCE_EVER" | "ONCE_PER_DAY",
     isActive: form.get("isActive") === "true",
     startDate: null,
     endDate: null,
@@ -71,17 +73,31 @@ export default function PuzzleEdit() {
   const [name, setName] = useState(config?.name ?? "");
   const [imageUrl, setImageUrl] = useState(config?.imageUrl ?? "");
   const [pieceCount, setPieceCount] = useState(String(config?.pieceCount ?? 9));
-  const [rewardType, setRewardType] = useState(config?.rewardType ?? "PERCENTAGE_DISCOUNT");
+  const [rewardType, setRewardType] = useState(
+    config?.rewardType ?? "PERCENTAGE_DISCOUNT",
+  );
   const [rewardValue, setRewardValue] = useState(config?.rewardValue ?? "10");
-  const [triggerMode, setTriggerMode] = useState(config?.triggerMode ?? "BUTTON");
+  const [triggerMode, setTriggerMode] = useState(
+    config?.triggerMode ?? "BUTTON",
+  );
   const [triggerPage, setTriggerPage] = useState(config?.triggerPage ?? "ALL");
-  const [playLimitType, setPlayLimitType] = useState(config?.playLimitType ?? "ONCE_EVER");
+  const [playLimitType, setPlayLimitType] = useState(
+    config?.playLimitType ?? "ONCE_EVER",
+  );
   const [isActive, setIsActive] = useState(config?.isActive ?? false);
 
   useEffect(() => {
-    if (uploadFetcher.data && typeof uploadFetcher.data === "object" && "imageUrl" in uploadFetcher.data) {
+    if (
+      uploadFetcher.data &&
+      typeof uploadFetcher.data === "object" &&
+      "imageUrl" in uploadFetcher.data
+    ) {
       setImageUrl(uploadFetcher.data.imageUrl);
-    } else if (uploadFetcher.data && typeof uploadFetcher.data === "object" && "error" in uploadFetcher.data) {
+    } else if (
+      uploadFetcher.data &&
+      typeof uploadFetcher.data === "object" &&
+      "error" in uploadFetcher.data
+    ) {
       shopify.toast.show("Görsel yüklenemedi", { isError: true });
     }
   }, [uploadFetcher.data, shopify]);
@@ -90,7 +106,8 @@ export default function PuzzleEdit() {
     if (!saveFetcher.data || typeof saveFetcher.data !== "object") return;
     if ("saved" in saveFetcher.data && saveFetcher.data.saved) {
       shopify.toast.show("Puzzle kaydedildi");
-      if (isNew) navigate(`/app/puzzles/${saveFetcher.data.id}`, { replace: true });
+      if (isNew)
+        navigate(`/app/puzzles/${saveFetcher.data.id}`, { replace: true });
     } else if ("error" in saveFetcher.data) {
       if (saveFetcher.data.error === "already_active") {
         shopify.toast.show(
@@ -104,7 +121,9 @@ export default function PuzzleEdit() {
   }, [saveFetcher.data, shopify, isNew, navigate]);
 
   const uploadError =
-    uploadFetcher.data && typeof uploadFetcher.data === "object" && "error" in uploadFetcher.data
+    uploadFetcher.data &&
+    typeof uploadFetcher.data === "object" &&
+    "error" in uploadFetcher.data
       ? String(uploadFetcher.data.error)
       : undefined;
 
@@ -138,93 +157,108 @@ export default function PuzzleEdit() {
   }
 
   return (
-    <s-page heading={isNew ? "Yeni puzzle" : "Puzzle düzenle"}>
-      <s-section heading="Puzzle bilgileri">
-        <s-text-field
-          label="Puzzle adı"
-          value={name}
-          onChange={(event) => setName(event.currentTarget.value)}
-        />
+    <s-page>
+      <s-stack gap="large">
+        <s-grid gridTemplateColumns="1fr auto" gap="base" alignItems="center">
+          <s-heading>{isNew ? "Yeni puzzle" : "Puzzle düzenle"}</s-heading>
+          <s-button href="/app/puzzles">Puzzle&apos;lara dön</s-button>
+        </s-grid>
 
-        <s-drop-zone
-          label="Puzzle görseli"
-          accept="image/jpeg,image/png,image/webp"
-          error={uploadError}
-          onChange={handleDrop}
-        >
-          {imageUrl ? <s-thumbnail src={imageUrl} alt="Puzzle görseli" size="large" /> : null}
-        </s-drop-zone>
+        <s-section heading="Puzzle bilgileri">
+          <s-text-field
+            label="Puzzle adı"
+            value={name}
+            onChange={(event) => setName(event.currentTarget.value)}
+          />
 
-        <s-select
-          label="Parça sayısı"
-          value={pieceCount}
-          onChange={(event) => setPieceCount(event.currentTarget.value)}
-        >
-          <s-option value="4">4</s-option>
-          <s-option value="6">6</s-option>
-          <s-option value="9">9</s-option>
-          <s-option value="12">12</s-option>
-          <s-option value="16">16</s-option>
-        </s-select>
+          <s-drop-zone
+            label="Puzzle görseli"
+            accept="image/jpeg,image/png,image/webp"
+            error={uploadError}
+            onChange={handleDrop}
+          >
+            {imageUrl ? (
+              <s-thumbnail src={imageUrl} alt="Puzzle görseli" size="large" />
+            ) : null}
+          </s-drop-zone>
 
-        <s-select
-          label="Ödül tipi"
-          value={rewardType}
-          onChange={(event) => setRewardType(event.currentTarget.value)}
-        >
-          <s-option value="PERCENTAGE_DISCOUNT">Yüzde indirim</s-option>
-          <s-option value="FREE_PRODUCT_DISCOUNT">Ücretsiz ürün indirimi</s-option>
-        </s-select>
+          <s-select
+            label="Parça sayısı"
+            value={pieceCount}
+            onChange={(event) => setPieceCount(event.currentTarget.value)}
+          >
+            <s-option value="4">4</s-option>
+            <s-option value="6">6</s-option>
+            <s-option value="9">9</s-option>
+            <s-option value="12">12</s-option>
+            <s-option value="16">16</s-option>
+          </s-select>
 
-        <s-text-field
-          label={rewardType === "PERCENTAGE_DISCOUNT" ? "İndirim yüzdesi" : "Ürün ID'si"}
-          value={rewardValue}
-          onChange={(event) => setRewardValue(event.currentTarget.value)}
-        />
+          <s-select
+            label="Ödül tipi"
+            value={rewardType}
+            onChange={(event) => setRewardType(event.currentTarget.value)}
+          >
+            <s-option value="PERCENTAGE_DISCOUNT">Yüzde indirim</s-option>
+            <s-option value="FREE_PRODUCT_DISCOUNT">
+              Ücretsiz ürün indirimi
+            </s-option>
+          </s-select>
 
-        <s-select
-          label="Tetikleme modu"
-          value={triggerMode}
-          onChange={(event) => setTriggerMode(event.currentTarget.value)}
-        >
-          <s-option value="BUTTON">Sadece buton</s-option>
-          <s-option value="AUTO">Otomatik açılır</s-option>
-          <s-option value="BOTH">İkisi de</s-option>
-        </s-select>
+          <s-text-field
+            label={
+              rewardType === "PERCENTAGE_DISCOUNT"
+                ? "İndirim yüzdesi"
+                : "Ürün ID'si"
+            }
+            value={rewardValue}
+            onChange={(event) => setRewardValue(event.currentTarget.value)}
+          />
 
-        <s-select
-          label="Hangi sayfada gösterilsin"
-          value={triggerPage}
-          onChange={(event) => setTriggerPage(event.currentTarget.value)}
-        >
-          <s-option value="ALL">Tüm sayfalar</s-option>
-          <s-option value="CART">Sepet</s-option>
-          <s-option value="PRODUCT">Ürün</s-option>
-        </s-select>
+          <s-select
+            label="Tetikleme modu"
+            value={triggerMode}
+            onChange={(event) => setTriggerMode(event.currentTarget.value)}
+          >
+            <s-option value="BUTTON">Sadece buton</s-option>
+            <s-option value="AUTO">Otomatik açılır</s-option>
+            <s-option value="BOTH">İkisi de</s-option>
+          </s-select>
 
-        <s-select
-          label="Oynama sınırı"
-          value={playLimitType}
-          onChange={(event) => setPlayLimitType(event.currentTarget.value)}
-        >
-          <s-option value="ONCE_EVER">Kişi başı bir kez</s-option>
-          <s-option value="ONCE_PER_DAY">Günde bir kez</s-option>
-        </s-select>
+          <s-select
+            label="Hangi sayfada gösterilsin"
+            value={triggerPage}
+            onChange={(event) => setTriggerPage(event.currentTarget.value)}
+          >
+            <s-option value="ALL">Tüm sayfalar</s-option>
+            <s-option value="CART">Sepet</s-option>
+            <s-option value="PRODUCT">Ürün</s-option>
+          </s-select>
 
-        <s-checkbox
-          label="Aktif"
-          checked={isActive}
-          onChange={(event) => setIsActive(event.currentTarget.checked)}
-        ></s-checkbox>
+          <s-select
+            label="Oynama sınırı"
+            value={playLimitType}
+            onChange={(event) => setPlayLimitType(event.currentTarget.value)}
+          >
+            <s-option value="ONCE_EVER">Kişi başı bir kez</s-option>
+            <s-option value="ONCE_PER_DAY">Günde bir kez</s-option>
+          </s-select>
 
-        <s-button
-          variant="primary"
-          onClick={handleSave}
-          loading={saveFetcher.state !== "idle"}
-        >
-          Kaydet
-        </s-button>
-      </s-section>
+          <s-checkbox
+            label="Aktif"
+            checked={isActive}
+            onChange={(event) => setIsActive(event.currentTarget.checked)}
+          ></s-checkbox>
+
+          <s-button
+            variant="primary"
+            onClick={handleSave}
+            loading={saveFetcher.state !== "idle"}
+          >
+            Kaydet
+          </s-button>
+        </s-section>
+      </s-stack>
     </s-page>
   );
 }
