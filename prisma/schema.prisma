@@ -54,6 +54,17 @@ model PuzzleConfig {
   @@index([shopDomain])
 }
 
+// Per-shop onboarding state. The setup guide's first two steps are derived
+// from real data (does a puzzle exist / is one active), but "did the merchant
+// turn on the theme app embed" can't be read back from the Admin API without
+// a themes scope and a settings_data.json fetch, so the merchant marks it
+// themselves and we remember it here.
+model ShopSetup {
+  shopDomain      String   @id
+  themeEmbedDone  Boolean  @default(false)
+  updatedAt       DateTime @updatedAt
+}
+
 model PlayRecord {
   id           String   @id @default(cuid())
   shopDomain   String

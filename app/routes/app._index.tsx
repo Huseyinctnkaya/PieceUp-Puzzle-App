@@ -1,57 +1,168 @@
-import { useLoaderData } from "react-router";
-import type { LoaderFunctionArgs } from "react-router";
+import { useState } from "react";
+import { useFetcher, useLoaderData } from "react-router";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import { listPuzzleConfigs } from "../models/puzzleConfig.server";
+import { isThemeEmbedDone, setThemeEmbedDone } from "../models/shopSetup.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const { session } = await authenticate.admin(request);
-  const puzzles = await listPuzzleConfigs(session.shop);
+  const [puzzles, themeEmbedDone] = await Promise.all([
+    listPuzzleConfigs(session.shop),
+    isThemeEmbedDone(session.shop),
+  ]);
   return {
     hasPuzzle: puzzles.length > 0,
     hasActivePuzzle: puzzles.some((p) => p.isActive),
+    themeEmbedDone,
     themeEditorUrl: `https://${session.shop}/admin/themes/current/editor?context=apps`,
   };
 }
 
-function SetupStep({ done, label }: { done: boolean; label: string }) {
-  return (
-    <s-stack direction="inline" gap="small-200" alignItems="center">
-      <s-icon
-        type={done ? "check-circle-filled" : "circle"}
-        tone={done ? "success" : "neutral"}
-      />
-      <s-text color={done ? "subdued" : "base"}>{label}</s-text>
-      {done ? <s-badge tone="success">Tamamlandı</s-badge> : null}
-    </s-stack>
-  );
+export async function action({ request }: ActionFunctionArgs) {
+  const { session } = await authenticate.admin(request);
+  const form = await request.formData();
+  await setThemeEmbedDone(session.shop, form.get("done") === "true");
+  return { ok: true };
 }
 
+type Step = {
+  label: string;
+  description: string;
+  done: boolean;
+  action: React.ReactNode;
+};
+
 export default function Dashboard() {
-  const { hasPuzzle, hasActivePuzzle, themeEditorUrl } = useLoaderData<typeof loader>();
-  const completed = [hasPuzzle, hasActivePuzzle].filter(Boolean).length;
+  const { hasPuzzle, hasActivePuzzle, themeEmbedDone, themeEditorUrl } =
+    useLoaderData<typeof loader>();
+  const embedFetcher = useFetcher<typeof action>();
+  const [guideOpen, setGuideOpen] = useState(true);
+
+  // Optimistic: reflect the toggle immediately instead of waiting for the
+  // loader to revalidate, so the checklist doesn't lag behind the click.
+  const embedDone = embedFetcher.formData
+    ? embedFetcher.formData.get("done") === "true"
+    : themeEmbedDone;
+
+  const steps: Step[] = [
+    {
+      label: "İlk puzzle'ınızı oluşturun",
+      description:
+        "Bir görsel yükleyin, parça sayısını ve ödülü belirleyin. Puzzle'ınız birkaç dakikada hazır.",
+      done: hasPuzzle,
+      action: (
+        <s-button variant="primary" href="/app/puzzles/new">
+          Puzzle oluştur
+        </s-button>
+      ),
+    },
+    {
+      label: "Bir puzzle'ı aktif edin",
+      description:
+        "Aynı anda yalnızca bir puzzle yayında olabilir. Yayınlamak istediğiniz puzzle'ı aktif edin.",
+      done: hasActivePuzzle,
+      action: <s-button href="/app/puzzles">Puzzle&apos;ları görüntüle</s-button>,
+    },
+    {
+      label: "Mağazanızda widget'ı etkinleştirin",
+      description:
+        "Puzzle'ın müşterilere görünmesi için tema düzenleyicisinden PieceUp app embed'ini açın.",
+      done: embedDone,
+      action: (
+        <s-stack direction="inline" gap="small-200">
+          <s-button href={themeEditorUrl} target="_blank">
+            Tema düzenleyiciyi aç
+          </s-button>
+          <s-button
+            variant="tertiary"
+            loading={embedFetcher.state !== "idle"}
+            onClick={() =>
+              embedFetcher.submit({ done: String(!embedDone) }, { method: "post" })
+            }
+          >
+            {embedDone ? "Tamamlanmadı olarak işaretle" : "Tamamlandı olarak işaretle"}
+          </s-button>
+        </s-stack>
+      ),
+    },
+  ];
+
+  const completed = steps.filter((s) => s.done).length;
+  const firstOpen = steps.findIndex((s) => !s.done);
+  const [openStep, setOpenStep] = useState(firstOpen === -1 ? -1 : firstOpen);
 
   return (
-    <s-page heading="PieceUp">
+    <s-page>
       <s-stack gap="large">
-        <s-text color="subdued">
-          Mağazanız için sürükle-bırak bulmaca kampanyaları oluşturun ve yönetin.
-        </s-text>
+        <s-stack gap="small-400">
+          <s-heading>PieceUp</s-heading>
+          <s-text color="subdued">
+            Mağazanız için sürükle-bırak bulmaca kampanyaları oluşturun ve yönetin.
+          </s-text>
+        </s-stack>
 
-        <s-section>
-          <s-stack gap="base">
-            <s-stack direction="inline" gap="small-200" alignItems="center">
-              <s-heading>Kurulum rehberi</s-heading>
-              <s-badge tone={completed === 2 ? "success" : "info"}>
-                {completed} / 2 tamamlandı
-              </s-badge>
-            </s-stack>
-            <s-text color="subdued">
-              Uygulamanızı çalışır hale getirmek için bu adımları tamamlayın.
-            </s-text>
-            <s-divider />
-            <SetupStep done={hasPuzzle} label="İlk puzzle'ınızı oluşturun" />
-            <SetupStep done={hasActivePuzzle} label="Bir puzzle'ı aktif edin" />
-          </s-stack>
+        <s-section padding="none">
+          <s-box padding="base">
+            <s-grid gridTemplateColumns="1fr auto" gap="base">
+              <s-stack gap="small-500">
+                <s-stack direction="inline" gap="small-200" alignItems="center">
+                  <s-heading>Kurulum rehberi</s-heading>
+                  <s-badge tone={completed === steps.length ? "success" : "info"}>
+                    {completed} / {steps.length} tamamlandı
+                  </s-badge>
+                </s-stack>
+                <s-text color="subdued">
+                  Uygulamanızı çalışır hale getirmek için bu adımları tamamlayın.
+                </s-text>
+              </s-stack>
+              <s-button
+                variant="tertiary"
+                icon={guideOpen ? "chevron-up" : "chevron-down"}
+                accessibilityLabel={guideOpen ? "Rehberi kapat" : "Rehberi aç"}
+                onClick={() => setGuideOpen(!guideOpen)}
+              ></s-button>
+            </s-grid>
+          </s-box>
+
+          {guideOpen
+            ? steps.map((step, index) => (
+                <s-box key={step.label} paddingBlockStart="none">
+                  <s-divider />
+                  <s-box padding="base">
+                    <s-grid gridTemplateColumns="1fr auto" gap="base">
+                      <s-stack direction="inline" gap="small-200" alignItems="center">
+                        <s-icon
+                          type={step.done ? "check-circle-filled" : "circle"}
+                          tone={step.done ? "success" : "neutral"}
+                        />
+                        <s-text type="strong">{step.label}</s-text>
+                        {step.done ? <s-badge tone="success">Tamamlandı</s-badge> : null}
+                      </s-stack>
+                      <s-button
+                        variant="tertiary"
+                        icon={openStep === index ? "chevron-up" : "chevron-down"}
+                        accessibilityLabel={
+                          openStep === index ? "Adımı kapat" : "Adımı aç"
+                        }
+                        onClick={() => setOpenStep(openStep === index ? -1 : index)}
+                      ></s-button>
+                    </s-grid>
+
+                    {openStep === index ? (
+                      <s-box paddingBlockStart="small-200" paddingInlineStart="large">
+                        <s-stack gap="base">
+                          <s-text color="subdued">{step.description}</s-text>
+                          <s-stack direction="inline" gap="small-200">
+                            {step.action}
+                          </s-stack>
+                        </s-stack>
+                      </s-box>
+                    ) : null}
+                  </s-box>
+                </s-box>
+              ))
+            : null}
         </s-section>
 
         <s-grid gridTemplateColumns="1fr 1fr 1fr" gap="base">
