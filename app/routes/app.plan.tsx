@@ -9,6 +9,10 @@ import { listPuzzleConfigs } from "../models/puzzleConfig.server";
 import { PLANS, PLAN_KEYS, TRIAL_DAYS, paidPlanName } from "../lib/plans";
 import type { PlanKey } from "../lib/plans";
 
+// The header the adapter uses to carry a URL the top window should be sent to.
+// Not exported by the package, so it's named here rather than duplicated inline.
+const REAUTH_URL_HEADER = "X-Shopify-API-Request-Failure-Reauthorize-Url";
+
 export async function loader({ request }: LoaderFunctionArgs) {
   const { session, admin } = await authenticate.admin(request);
   const [subscription, rewardsThisMonth, puzzles] = await Promise.all([
@@ -57,13 +61,28 @@ export async function action({ request }: ActionFunctionArgs) {
     return { error: "unknown_plan" };
   }
 
-  // Always throws a redirect to Shopify's charge approval screen, so nothing
-  // after this runs on the happy path.
-  return billing.request({
-    plan: billingName,
-    isTest: process.env.NODE_ENV !== "production",
-    returnUrl: `${process.env.SHOPIFY_APP_URL}/app/plan?shop=${session.shop}`,
-  });
+  // billing.request never returns: it throws a 401 Response carrying the
+  // charge confirmation URL in an App Bridge header, meant to be intercepted
+  // and turned into a top-level redirect. That interception doesn't happen for
+  // a fetcher submission, which is why the app previously hung on "Handling
+  // response" — so catch it, pull the URL out, and hand it back for the client
+  // to navigate to explicitly.
+  try {
+    await billing.request({
+      plan: billingName,
+      isTest: process.env.NODE_ENV !== "production",
+      returnUrl: `${process.env.SHOPIFY_APP_URL}/app/plan?shop=${session.shop}`,
+    });
+    // Unreachable in practice; billing.request always throws.
+    return { error: "no_confirmation_url" };
+  } catch (thrown) {
+    const confirmationUrl =
+      thrown instanceof Response ? thrown.headers.get(REAUTH_URL_HEADER) : null;
+    if (confirmationUrl) return { confirmationUrl };
+    // Anything else is a real failure (a redirect we can't read, an API
+    // error), so let it surface rather than silently doing nothing.
+    throw thrown;
+  }
 }
 
 function formatPrice(price: number) {
@@ -84,7 +103,11 @@ export default function PlanPage() {
 
   useEffect(() => {
     if (!planFetcher.data || typeof planFetcher.data !== "object") return;
-    if ("downgraded" in planFetcher.data) {
+    if ("confirmationUrl" in planFetcher.data) {
+      // "_top" breaks out of the admin's iframe. Without it the charge screen
+      // would try to load inside the embedded frame, which Shopify blocks.
+      open(planFetcher.data.confirmationUrl, "_top");
+    } else if ("downgraded" in planFetcher.data) {
       shopify.toast.show("Aboneliğiniz iptal edildi, Free plana geçtiniz");
     } else if ("error" in planFetcher.data) {
       shopify.toast.show("İşlem tamamlanamadı, lütfen tekrar deneyin", {
