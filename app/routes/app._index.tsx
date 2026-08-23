@@ -3,7 +3,10 @@ import { useFetcher, useLoaderData } from "react-router";
 import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import { listPuzzleConfigs } from "../models/puzzleConfig.server";
-import { isThemeEmbedDone, setThemeEmbedDone } from "../models/shopSetup.server";
+import {
+  isThemeEmbedDone,
+  setThemeEmbedDone,
+} from "../models/shopSetup.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const { session } = await authenticate.admin(request);
@@ -32,6 +35,40 @@ type Step = {
   done: boolean;
   action: React.ReactNode;
 };
+
+// Animates between collapsed and expanded without needing to know the content's
+// height. The 0fr → 1fr grid row transition resolves against the content's own
+// size, so nothing has to be measured or hardcoded; the inner wrapper does the
+// clipping. `visibility` is transitioned rather than toggled outright so the
+// content stays visible for the duration of the close animation, but is still
+// properly removed from tab order once collapsed.
+function Collapsible({
+  open,
+  children,
+}: {
+  open: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateRows: open ? "1fr" : "0fr",
+        transition: "grid-template-rows 250ms ease",
+      }}
+    >
+      <div
+        style={{
+          overflow: "hidden",
+          visibility: open ? "visible" : "hidden",
+          transition: "visibility 250ms",
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
 
 export default function Dashboard() {
   const { hasPuzzle, hasActivePuzzle, themeEmbedDone, themeEditorUrl } =
@@ -62,7 +99,9 @@ export default function Dashboard() {
       description:
         "Aynı anda yalnızca bir puzzle yayında olabilir. Yayınlamak istediğiniz puzzle'ı aktif edin.",
       done: hasActivePuzzle,
-      action: <s-button href="/app/puzzles">Puzzle&apos;ları görüntüle</s-button>,
+      action: (
+        <s-button href="/app/puzzles">Puzzle&apos;ları görüntüle</s-button>
+      ),
     },
     {
       label: "Mağazanızda widget'ı etkinleştirin",
@@ -78,10 +117,15 @@ export default function Dashboard() {
             variant="tertiary"
             loading={embedFetcher.state !== "idle"}
             onClick={() =>
-              embedFetcher.submit({ done: String(!embedDone) }, { method: "post" })
+              embedFetcher.submit(
+                { done: String(!embedDone) },
+                { method: "post" },
+              )
             }
           >
-            {embedDone ? "Tamamlanmadı olarak işaretle" : "Tamamlandı olarak işaretle"}
+            {embedDone
+              ? "Tamamlanmadı olarak işaretle"
+              : "Tamamlandı olarak işaretle"}
           </s-button>
         </s-stack>
       ),
@@ -98,7 +142,8 @@ export default function Dashboard() {
         <s-stack gap="small-400">
           <s-heading>PieceUp</s-heading>
           <s-text color="subdued">
-            Mağazanız için sürükle-bırak bulmaca kampanyaları oluşturun ve yönetin.
+            Mağazanız için sürükle-bırak bulmaca kampanyaları oluşturun ve
+            yönetin.
           </s-text>
         </s-stack>
 
@@ -108,12 +153,15 @@ export default function Dashboard() {
               <s-stack gap="small-500">
                 <s-stack direction="inline" gap="small-200" alignItems="center">
                   <s-heading>Kurulum rehberi</s-heading>
-                  <s-badge tone={completed === steps.length ? "success" : "info"}>
+                  <s-badge
+                    tone={completed === steps.length ? "success" : "info"}
+                  >
                     {completed} / {steps.length} tamamlandı
                   </s-badge>
                 </s-stack>
                 <s-text color="subdued">
-                  Uygulamanızı çalışır hale getirmek için bu adımları tamamlayın.
+                  Uygulamanızı çalışır hale getirmek için bu adımları
+                  tamamlayın.
                 </s-text>
               </s-stack>
               <s-button
@@ -125,61 +173,82 @@ export default function Dashboard() {
             </s-grid>
           </s-box>
 
-          {guideOpen
-            ? steps.map((step, index) => (
-                <s-box key={step.label} paddingBlockStart="none">
-                  <s-divider />
-                  <s-box padding="base">
-                    <s-grid gridTemplateColumns="1fr auto" gap="base">
-                      <s-stack direction="inline" gap="small-200" alignItems="center">
-                        <s-icon
-                          type={step.done ? "check-circle-filled" : "circle"}
-                          tone={step.done ? "success" : "neutral"}
-                        />
-                        <s-text type="strong">{step.label}</s-text>
-                        {step.done ? <s-badge tone="success">Tamamlandı</s-badge> : null}
-                      </s-stack>
-                      <s-button
-                        variant="tertiary"
-                        icon={openStep === index ? "chevron-up" : "chevron-down"}
-                        accessibilityLabel={
-                          openStep === index ? "Adımı kapat" : "Adımı aç"
-                        }
-                        onClick={() => setOpenStep(openStep === index ? -1 : index)}
-                      ></s-button>
-                    </s-grid>
+          <Collapsible open={guideOpen}>
+            {steps.map((step, index) => (
+              <s-box key={step.label} paddingBlockStart="none">
+                <s-divider />
+                <s-box padding="base">
+                  <s-grid gridTemplateColumns="1fr auto" gap="base">
+                    <s-stack
+                      direction="inline"
+                      gap="small-200"
+                      alignItems="center"
+                    >
+                      <s-icon
+                        type={step.done ? "check-circle-filled" : "circle"}
+                        tone={step.done ? "success" : "neutral"}
+                      />
+                      <s-text type="strong">{step.label}</s-text>
+                      {step.done ? (
+                        <s-badge tone="success">Tamamlandı</s-badge>
+                      ) : null}
+                    </s-stack>
+                    <s-button
+                      variant="tertiary"
+                      icon={openStep === index ? "chevron-up" : "chevron-down"}
+                      accessibilityLabel={
+                        openStep === index ? "Adımı kapat" : "Adımı aç"
+                      }
+                      onClick={() =>
+                        setOpenStep(openStep === index ? -1 : index)
+                      }
+                    ></s-button>
+                  </s-grid>
 
-                    {openStep === index ? (
-                      <s-box paddingBlockStart="small-200" paddingInlineStart="large">
-                        <s-stack gap="base">
-                          <s-text color="subdued">{step.description}</s-text>
-                          <s-stack direction="inline" gap="small-200">
-                            {step.action}
-                          </s-stack>
+                  <Collapsible open={openStep === index}>
+                    <s-box
+                      paddingBlockStart="small-200"
+                      paddingInlineStart="large"
+                    >
+                      <s-stack gap="base">
+                        <s-text color="subdued">{step.description}</s-text>
+                        <s-stack direction="inline" gap="small-200">
+                          {step.action}
                         </s-stack>
-                      </s-box>
-                    ) : null}
-                  </s-box>
+                      </s-stack>
+                    </s-box>
+                  </Collapsible>
                 </s-box>
-              ))
-            : null}
+              </s-box>
+            ))}
+          </Collapsible>
         </s-section>
 
         <s-grid gridTemplateColumns="1fr 1fr 1fr" gap="base">
           <s-grid-item>
             <s-section heading="Puzzle'lar">
-              <s-stack gap="base" blockSize="100%" justifyContent="space-between">
+              <s-stack
+                gap="base"
+                blockSize="100%"
+                justifyContent="space-between"
+              >
                 <s-text color="subdued">
                   Tüm puzzle&apos;larınızı görüntüleyin, düzenleyin ve yönetin.
                 </s-text>
-                <s-button href="/app/puzzles">Puzzle&apos;ları görüntüle</s-button>
+                <s-button href="/app/puzzles">
+                  Puzzle&apos;ları görüntüle
+                </s-button>
               </s-stack>
             </s-section>
           </s-grid-item>
 
           <s-grid-item>
             <s-section heading="Yeni puzzle">
-              <s-stack gap="base" blockSize="100%" justifyContent="space-between">
+              <s-stack
+                gap="base"
+                blockSize="100%"
+                justifyContent="space-between"
+              >
                 <s-text color="subdued">
                   Görsel yükleyip yeni bir puzzle kampanyası oluşturun.
                 </s-text>
@@ -192,10 +261,14 @@ export default function Dashboard() {
 
           <s-grid-item>
             <s-section heading="Mağaza widget'ı">
-              <s-stack gap="base" blockSize="100%" justifyContent="space-between">
+              <s-stack
+                gap="base"
+                blockSize="100%"
+                justifyContent="space-between"
+              >
                 <s-text color="subdued">
-                  Puzzle&apos;ın mağazanızda görünmesi için tema düzenleyicisinden
-                  app embed&apos;ini etkinleştirin.
+                  Puzzle&apos;ın mağazanızda görünmesi için tema
+                  düzenleyicisinden app embed&apos;ini etkinleştirin.
                 </s-text>
                 <s-button href={themeEditorUrl} target="_blank">
                   Tema düzenleyiciyi aç
@@ -210,7 +283,11 @@ export default function Dashboard() {
             <s-grid-item>
               <s-box border="base" borderRadius="base" padding="base">
                 <s-stack gap="small-200">
-                  <s-stack direction="inline" gap="small-200" alignItems="center">
+                  <s-stack
+                    direction="inline"
+                    gap="small-200"
+                    alignItems="center"
+                  >
                     <s-icon type="email" />
                     {/* TODO: swap in the real support address once we have one */}
                     <s-link href="mailto:destek@example.com">
@@ -227,7 +304,11 @@ export default function Dashboard() {
             <s-grid-item>
               <s-box border="base" borderRadius="base" padding="base">
                 <s-stack gap="small-200">
-                  <s-stack direction="inline" gap="small-200" alignItems="center">
+                  <s-stack
+                    direction="inline"
+                    gap="small-200"
+                    alignItems="center"
+                  >
                     <s-icon type="book-open" />
                     {/* TODO: swap in the real docs URL once we have one */}
                     <s-link href="#">
