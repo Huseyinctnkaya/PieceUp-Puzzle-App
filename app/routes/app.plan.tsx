@@ -122,7 +122,11 @@ export default function PlanPage() {
     rewardLimit === null ? null : Math.max(rewardLimit - rewardsThisMonth, 0);
   const overRewardLimit =
     rewardLimit !== null && rewardsThisMonth >= rewardLimit;
-  const busy = planFetcher.state !== "idle";
+  // Which submission is in flight, so only the clicked button spins. A single
+  // shared `busy` flag spun every button at once.
+  const pending = planFetcher.state !== "idle" ? planFetcher.formData : null;
+  const pendingPlan = pending?.get("plan");
+  const pendingDowngrade = pending?.get("intent") === "downgrade";
 
   return (
     <s-page>
@@ -244,7 +248,8 @@ export default function PlanPage() {
                           // Dropping to Free means cancelling the subscription
                           // outright — there's no $0 charge to switch to.
                           <s-button
-                            loading={busy}
+                            loading={pendingDowngrade}
+                            disabled={Boolean(pending) && !pendingDowngrade}
                             onClick={() =>
                               planFetcher.submit(
                                 {
@@ -260,7 +265,8 @@ export default function PlanPage() {
                         ) : (
                           <s-button
                             variant="primary"
-                            loading={busy}
+                            loading={pendingPlan === key}
+                            disabled={Boolean(pending) && pendingPlan !== key}
                             onClick={() =>
                               planFetcher.submit(
                                 { intent: "subscribe", plan: key },
