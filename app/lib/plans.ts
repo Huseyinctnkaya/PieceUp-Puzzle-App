@@ -1,10 +1,19 @@
-// The plan catalogue. These entries must mirror the plans configured in the
-// Partner Dashboard, because Shopify's managed pricing owns the actual billing
-// and only hands us back the plan's *name* on the subscription. `shopifyName`
-// is the matching key: if it drifts from the dashboard, a paying merchant
-// silently falls back to Free, so treat it as a contract, not a label.
+// The plan catalogue, and the single source of truth for pricing: the billing
+// config in shopify.server.ts is built from these entries, so the charge a
+// merchant approves is always the price shown on the plan page. `shopifyName`
+// is the key Shopify stores on the subscription and that getSubscription maps
+// back, so treat it as a contract rather than a label.
 export const PLAN_KEYS = ["free", "pro", "premium"] as const;
 export type PlanKey = (typeof PLAN_KEYS)[number];
+
+/**
+ * Names of the plans that carry a charge, kept as literal types so the billing
+ * config's keys and `billing.request({ plan })` typecheck against each other —
+ * a typo becomes a compile error rather than a failed charge at runtime.
+ */
+export const PAID_PLAN_NAMES = { pro: "Pro", premium: "Premium" } as const;
+export type PaidPlanName =
+  (typeof PAID_PLAN_NAMES)[keyof typeof PAID_PLAN_NAMES];
 
 export type Plan = {
   key: PlanKey;
@@ -40,7 +49,7 @@ export const PLANS: Record<PlanKey, Plan> = {
   },
   pro: {
     key: "pro",
-    shopifyName: "Pro",
+    shopifyName: PAID_PLAN_NAMES.pro,
     title: "Pro",
     price: 14.99,
     monthlyRewardLimit: 1000,
@@ -56,7 +65,7 @@ export const PLANS: Record<PlanKey, Plan> = {
   },
   premium: {
     key: "premium",
-    shopifyName: "Premium",
+    shopifyName: PAID_PLAN_NAMES.premium,
     title: "Premium",
     price: 39.99,
     monthlyRewardLimit: null,
@@ -91,8 +100,7 @@ export function planFromShopifyName(name: string | null | undefined): Plan {
   );
 }
 
-/** The Shopify-hosted plan selection page for managed pricing. */
-export function pricingPlansUrl(shopDomain: string, appHandle = "pieceup") {
-  const storeHandle = shopDomain.replace(/\.myshopify\.com$/, "");
-  return `https://admin.shopify.com/store/${storeHandle}/charges/${appHandle}/pricing_plans`;
+/** The billing name for a paid plan, or null for Free (which has no charge). */
+export function paidPlanName(key: PlanKey): PaidPlanName | null {
+  return key === "pro" || key === "premium" ? PAID_PLAN_NAMES[key] : null;
 }

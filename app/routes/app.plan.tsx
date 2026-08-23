@@ -1,10 +1,13 @@
-import { useLoaderData } from "react-router";
-import type { LoaderFunctionArgs } from "react-router";
+import { useEffect } from "react";
+import { useFetcher, useLoaderData } from "react-router";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
+import { useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import { getSubscription } from "../services/billing.server";
 import { countRewardsThisMonth } from "../models/playRecord.server";
 import { listPuzzleConfigs } from "../models/puzzleConfig.server";
-import { PLANS, PLAN_KEYS, TRIAL_DAYS, pricingPlansUrl } from "../lib/plans";
+import { PLANS, PLAN_KEYS, TRIAL_DAYS, paidPlanName } from "../lib/plans";
+import type { PlanKey } from "../lib/plans";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const { session, admin } = await authenticate.admin(request);
@@ -16,12 +19,51 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   return {
     currentPlanKey: subscription.plan.key,
+    subscriptionId: subscription.id,
     trialDays: subscription.trialDays,
     currentPeriodEnd: subscription.currentPeriodEnd,
     rewardsThisMonth,
     puzzleCount: puzzles.length,
-    pricingUrl: pricingPlansUrl(session.shop),
   };
+}
+
+export async function action({ request }: ActionFunctionArgs) {
+  const { billing, session } = await authenticate.admin(request);
+  const form = await request.formData();
+  const intent = String(form.get("intent") || "");
+
+  if (intent === "downgrade") {
+    const subscriptionId = String(form.get("subscriptionId") || "");
+    if (!subscriptionId) return { error: "missing_subscription" };
+    try {
+      // prorate: the merchant gets credited for the unused days rather than
+      // paying for time they've given up.
+      await billing.cancel({
+        subscriptionId,
+        isTest: process.env.NODE_ENV !== "production",
+        prorate: true,
+      });
+      return { downgraded: true };
+    } catch {
+      return { error: "cancel_failed" };
+    }
+  }
+
+  const requested = String(form.get("plan") || "");
+  const billingName = (PLAN_KEYS as readonly string[]).includes(requested)
+    ? paidPlanName(requested as PlanKey)
+    : null;
+  if (!billingName) {
+    return { error: "unknown_plan" };
+  }
+
+  // Always throws a redirect to Shopify's charge approval screen, so nothing
+  // after this runs on the happy path.
+  return billing.request({
+    plan: billingName,
+    isTest: process.env.NODE_ENV !== "production",
+    returnUrl: `${process.env.SHOPIFY_APP_URL}/app/plan?shop=${session.shop}`,
+  });
 }
 
 function formatPrice(price: number) {
@@ -31,12 +73,25 @@ function formatPrice(price: number) {
 export default function PlanPage() {
   const {
     currentPlanKey,
+    subscriptionId,
     trialDays,
     currentPeriodEnd,
     rewardsThisMonth,
     puzzleCount,
-    pricingUrl,
   } = useLoaderData<typeof loader>();
+  const planFetcher = useFetcher<typeof action>();
+  const shopify = useAppBridge();
+
+  useEffect(() => {
+    if (!planFetcher.data || typeof planFetcher.data !== "object") return;
+    if ("downgraded" in planFetcher.data) {
+      shopify.toast.show("Aboneliğiniz iptal edildi, Free plana geçtiniz");
+    } else if ("error" in planFetcher.data) {
+      shopify.toast.show("İşlem tamamlanamadı, lütfen tekrar deneyin", {
+        isError: true,
+      });
+    }
+  }, [planFetcher.data, shopify]);
 
   const currentPlan = PLANS[currentPlanKey];
   const rewardLimit = currentPlan.monthlyRewardLimit;
@@ -44,6 +99,7 @@ export default function PlanPage() {
     rewardLimit === null ? null : Math.max(rewardLimit - rewardsThisMonth, 0);
   const overRewardLimit =
     rewardLimit !== null && rewardsThisMonth >= rewardLimit;
+  const busy = planFetcher.state !== "idle";
 
   return (
     <s-page>
@@ -107,8 +163,8 @@ export default function PlanPage() {
         <s-section heading="Planlar">
           <s-stack gap="base">
             <s-text color="subdued">
-              Ücretli planlar {TRIAL_DAYS} gün ücretsiz denenebilir. Plan
-              değişikliği Shopify üzerinden yapılır ve faturanıza yansır.
+              Ücretli planlar {TRIAL_DAYS} gün ücretsiz denenebilir. Ücret
+              Shopify faturanıza yansır.
             </s-text>
 
             {/* stretch + blockSize 100% below: without both, each card is only
@@ -122,6 +178,7 @@ export default function PlanPage() {
               {PLAN_KEYS.map((key) => {
                 const plan = PLANS[key];
                 const isCurrent = key === currentPlanKey;
+                const isFree = plan.price === 0;
                 return (
                   <s-grid-item key={key}>
                     <s-box
@@ -149,7 +206,7 @@ export default function PlanPage() {
                           </s-stack>
                           <s-text type="strong">
                             {formatPrice(plan.price)}
-                            {plan.price === 0 ? "" : " / ay"}
+                            {isFree ? "" : " / ay"}
                           </s-text>
                           <s-unordered-list>
                             {plan.features.map((feature) => (
@@ -160,13 +217,37 @@ export default function PlanPage() {
 
                         {isCurrent ? (
                           <s-button disabled>Kullanımda</s-button>
+                        ) : isFree ? (
+                          // Dropping to Free means cancelling the subscription
+                          // outright — there's no $0 charge to switch to.
+                          <s-button
+                            loading={busy}
+                            onClick={() =>
+                              planFetcher.submit(
+                                {
+                                  intent: "downgrade",
+                                  subscriptionId: subscriptionId ?? "",
+                                },
+                                { method: "post" },
+                              )
+                            }
+                          >
+                            Free plana dön
+                          </s-button>
                         ) : (
                           <s-button
-                            variant={plan.price === 0 ? "auto" : "primary"}
-                            href={pricingUrl}
-                            target="_blank"
+                            variant="primary"
+                            loading={busy}
+                            onClick={() =>
+                              planFetcher.submit(
+                                { intent: "subscribe", plan: key },
+                                { method: "post" },
+                              )
+                            }
                           >
-                            {plan.price === 0 ? "Bu plana geç" : "Yükselt"}
+                            {currentPlan.price > plan.price
+                              ? "Bu plana geç"
+                              : "Yükselt"}
                           </s-button>
                         )}
                       </s-stack>

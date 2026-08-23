@@ -17,6 +17,8 @@ const ACTIVE_SUBSCRIPTION_QUERY = `#graphql
 
 export type Subscription = {
   plan: Plan;
+  /** Shopify's subscription GID, needed to cancel. null when on Free. */
+  id: string | null;
   status: string | null;
   trialDays: number | null;
   currentPeriodEnd: string | null;
@@ -47,6 +49,7 @@ export async function getSubscription(
     if (!active) {
       return {
         plan: FREE_PLAN,
+        id: null,
         status: null,
         trialDays: null,
         currentPeriodEnd: null,
@@ -55,6 +58,7 @@ export async function getSubscription(
 
     return {
       plan: planFromShopifyName(active.name),
+      id: active.id ?? null,
       status: active.status ?? null,
       trialDays: active.trialDays ?? null,
       currentPeriodEnd: active.currentPeriodEnd ?? null,
@@ -62,6 +66,7 @@ export async function getSubscription(
   } catch {
     return {
       plan: FREE_PLAN,
+      id: null,
       status: null,
       trialDays: null,
       currentPeriodEnd: null,
