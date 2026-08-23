@@ -35,7 +35,8 @@ model Session {
 
 model PuzzleConfig {
   id                  String    @id @default(cuid())
-  shopDomain          String    @unique
+  shopDomain          String
+  name                String    @default("Puzzle")
   imageUrl            String?
   pieceCount          Int       @default(9)
   rewardType          String    @default("PERCENTAGE_DISCOUNT")
@@ -49,6 +50,8 @@ model PuzzleConfig {
   endDate             DateTime?
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
+
+  @@index([shopDomain])
 }
 
 model PlayRecord {
