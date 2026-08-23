@@ -79,8 +79,8 @@ export default function PuzzlesList() {
             <s-stack gap="base" alignItems="center">
               <s-heading>Henüz puzzle yok</s-heading>
               <s-text color="subdued">
-                İlk puzzle&apos;ınızı oluşturarak müşterilerinize ödüllü bir bulmaca
-                sunmaya başlayın.
+                İlk puzzle&apos;ınızı oluşturarak müşterilerinize ödüllü bir
+                bulmaca sunmaya başlayın.
               </s-text>
               <s-button variant="primary" href="/app/puzzles/new">
                 Puzzle oluştur
@@ -97,9 +97,10 @@ export default function PuzzlesList() {
               <s-table-header-row>
                 <s-table-header listSlot="primary">Ad</s-table-header>
                 <s-table-header listSlot="inline">Durum</s-table-header>
-                <s-table-header listSlot="labeled" format="numeric">
-                  Parça
-                </s-table-header>
+                {/* No format="numeric" here: it right-aligns the header text,
+                    but the cell below holds a badge that stays left-aligned,
+                    so the two ended up visibly out of line. */}
+                <s-table-header listSlot="labeled">Parça</s-table-header>
                 <s-table-header listSlot="labeled">Ödül</s-table-header>
                 <s-table-header>İşlemler</s-table-header>
               </s-table-header-row>
@@ -123,8 +124,13 @@ export default function PuzzlesList() {
                       </s-text>
                     </s-table-cell>
                     <s-table-cell>
-                      <s-stack direction="inline" gap="small-200" justifyContent="end">
-                        <s-button href={`/app/puzzles/${puzzle.id}`}>Düzenle</s-button>
+                      {/* Left-aligned to sit under the "İşlemler" header —
+                          pushing the buttons to the end left the header
+                          stranded at the far side of a wide column. */}
+                      <s-stack direction="inline" gap="small-200">
+                        <s-button href={`/app/puzzles/${puzzle.id}`}>
+                          Düzenle
+                        </s-button>
                         <s-button
                           tone="critical"
                           disabled={puzzle.isActive}
@@ -135,13 +141,18 @@ export default function PuzzlesList() {
                         </s-button>
                       </s-stack>
 
-                      <s-modal id={`delete-${puzzle.id}`} heading="Puzzle silinsin mi?">
+                      <s-modal
+                        id={`delete-${puzzle.id}`}
+                        heading="Puzzle silinsin mi?"
+                      >
                         <s-stack gap="base">
                           <s-text>
                             &quot;{puzzle.name}&quot; adlı puzzle kalıcı olarak
                             silinecek.
                           </s-text>
-                          <s-text tone="caution">Bu işlem geri alınamaz.</s-text>
+                          <s-text tone="caution">
+                            Bu işlem geri alınamaz.
+                          </s-text>
                         </s-stack>
                         <s-button
                           slot="primary-action"
@@ -150,7 +161,10 @@ export default function PuzzlesList() {
                           commandFor={`delete-${puzzle.id}`}
                           command="--hide"
                           onClick={() =>
-                            deleteFetcher.submit({ id: puzzle.id }, { method: "post" })
+                            deleteFetcher.submit(
+                              { id: puzzle.id },
+                              { method: "post" },
+                            )
                           }
                         >
                           Sil
