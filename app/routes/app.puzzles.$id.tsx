@@ -93,6 +93,8 @@ export default function PuzzleEdit() {
   // save so the save bar goes away, without needing the loader to re-run.
   const [baseline, setBaseline] = useState(initialForm);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const editImageRef = useRef<HTMLElementTagNameMap["s-button"]>(null);
+  const removeImageRef = useRef<HTMLElementTagNameMap["s-button"]>(null);
 
   const isDirty = useMemo(
     () => JSON.stringify(form) !== JSON.stringify(baseline),
@@ -173,6 +175,36 @@ export default function PuzzleEdit() {
     setForm(baseline);
   }
 
+  // The image action buttons live inside s-drop-zone, whose own native click
+  // listener opens a file picker. React 18 delegates events to the app root,
+  // so any React onClick here runs after that listener has already fired —
+  // clicking "Sil" would delete the image *and* pop open a file dialog.
+  // Attaching natively to the buttons themselves puts us earlier in the bubble
+  // path than s-drop-zone, so stopPropagation actually prevents it.
+  useEffect(() => {
+    const editButton = editImageRef.current;
+    const removeButton = removeImageRef.current;
+    if (!editButton || !removeButton) return;
+
+    const onEdit = (event: Event) => {
+      event.stopPropagation();
+      fileInputRef.current?.click();
+    };
+    const onRemove = (event: Event) => {
+      event.stopPropagation();
+      setForm((prev) => ({ ...prev, imageUrl: "" }));
+    };
+
+    editButton.addEventListener("click", onEdit);
+    removeButton.addEventListener("click", onRemove);
+    return () => {
+      editButton.removeEventListener("click", onEdit);
+      removeButton.removeEventListener("click", onRemove);
+    };
+    // Re-binds when the buttons mount/unmount, which tracks whether an image
+    // is currently set.
+  }, [form.imageUrl]);
+
   return (
     <s-page>
       <SaveBar id="puzzle-save-bar" open={isDirty}>
@@ -230,29 +262,20 @@ export default function PuzzleEdit() {
                       alt="Puzzle görseli"
                       size="large"
                     />
-                    {/* Plain div because s-stack takes no onClick. This is a
-                        click *barrier*, not a control: without it, clicking
-                        either button would also bubble to the drop zone and
-                        pop its file picker open. The a11y rules below want
-                        keyboard handlers on click targets, but the real
-                        controls are the buttons inside — adding key handlers
-                        to a wrapper that does nothing on its own would create
-                        a phantom tab stop. */}
-                    {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
-                    <div
-                      onClick={(event) => event.stopPropagation()}
-                      style={{ display: "flex", gap: 8 }}
-                    >
+                    {/* These two get native click listeners (see the effect
+                        above) instead of React's onClick. React 18 delegates
+                        all clicks to the app root, so a React handler here
+                        fires *after* s-drop-zone's own native listener has
+                        already opened its file picker — stopPropagation from
+                        a React handler is too late to prevent it. */}
+                    <div style={{ display: "flex", gap: 8 }}>
                       <s-button
+                        ref={editImageRef}
                         loading={uploadFetcher.state !== "idle"}
-                        onClick={() => fileInputRef.current?.click()}
                       >
                         Düzenle
                       </s-button>
-                      <s-button
-                        tone="critical"
-                        onClick={() => setField("imageUrl", "")}
-                      >
+                      <s-button ref={removeImageRef} tone="critical">
                         Sil
                       </s-button>
                     </div>
