@@ -224,7 +224,13 @@ export default function Dashboard() {
           </Collapsible>
         </s-section>
 
-        <s-grid gridTemplateColumns="1fr 1fr 1fr" gap="base">
+        {/* stretch so the three cards share the tallest one's height and
+            their buttons line up, rather than each sizing to its own copy. */}
+        <s-grid
+          gridTemplateColumns="1fr 1fr 1fr"
+          gap="base"
+          alignItems="stretch"
+        >
           <s-grid-item>
             <s-section heading="Puzzle'lar">
               <s-stack

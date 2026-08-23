@@ -111,7 +111,14 @@ export default function PlanPage() {
               değişikliği Shopify üzerinden yapılır ve faturanıza yansır.
             </s-text>
 
-            <s-grid gridTemplateColumns="1fr 1fr 1fr" gap="base">
+            {/* stretch + blockSize 100% below: without both, each card is only
+                as tall as its own feature list, so the tiers end up ragged and
+                their buttons sit at different heights. */}
+            <s-grid
+              gridTemplateColumns="1fr 1fr 1fr"
+              gap="base"
+              alignItems="stretch"
+            >
               {PLAN_KEYS.map((key) => {
                 const plan = PLANS[key];
                 const isCurrent = key === currentPlanKey;
@@ -122,6 +129,7 @@ export default function PlanPage() {
                       border={isCurrent ? "base" : "small"}
                       borderColor={isCurrent ? "strong" : "base"}
                       borderRadius="base"
+                      blockSize="100%"
                     >
                       <s-stack
                         gap="base"
