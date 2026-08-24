@@ -170,6 +170,12 @@ export function renderBoard(container, config, onComplete) {
 
   const stage = document.createElement("div");
   stage.className = "pieceup-stage";
+  // Every piece is absolutely positioned against this element, so if a theme
+  // rule ever takes `position` away the pieces resolve against some ancestor
+  // further up and land outside the popup — the puzzle looks empty. Declared
+  // inline and !important because we render inside the merchant's stylesheet,
+  // not our own, and this one property is load-bearing.
+  stage.style.setProperty("position", "relative", "important");
   card.appendChild(stage);
 
   const boardEl = document.createElement("div");
@@ -251,6 +257,8 @@ export function renderBoard(container, config, onComplete) {
     const tab = Math.min(cellWidth, cellHeight) * TAB_RATIO;
 
     return {
+      stageWidth: stageRect.width,
+      stageHeight: stageRect.height,
       boardX: boardRect.left - stageRect.left,
       boardY: boardRect.top - stageRect.top,
       boardWidth: boardRect.width,
@@ -270,22 +278,25 @@ export function renderBoard(container, config, onComplete) {
   /**
    * Whether the tray sits beside the board rather than under it.
    *
-   * Read from a media query mirroring the stylesheet's breakpoint, not from
-   * measurements: the tray's height depends on this decision and the decision
-   * would depend on that height, so measuring it oscillates between states.
+   * Read from the page, not from a media query mirroring the stylesheet's
+   * breakpoint. The two can disagree — an overriding theme rule, a stylesheet
+   * still loading, a cached older version — and when they do, the tray gets
+   * measured against an axis it isn't on and the pieces are placed nowhere
+   * near it.
+   *
+   * Compares the tray's top edge, which the layout decides, against the
+   * board's bottom. Deliberately not the tray's height: we set that ourselves
+   * from this very answer, and reading it back would oscillate.
    */
-  function isSideBySide() {
-    return (
-      typeof window !== "undefined" &&
-      typeof window.matchMedia === "function" &&
-      window.matchMedia(`(min-width: ${SIDE_BY_SIDE_MIN_WIDTH}px)`).matches
-    );
+  function isSideBySide(metrics) {
+    if (!metrics) return false;
+    return metrics.trayY < metrics.boardY + metrics.boardHeight;
   }
 
   function trayPlan(metrics) {
     // Beside the board the tray gets the board's full height; beneath it, only
     // a slice, so the board stays the focus.
-    const target = isSideBySide()
+    const target = isSideBySide(metrics)
       ? metrics.boardHeight
       : Math.min(TRAY_HEIGHT_MAX, metrics.boardHeight * TRAY_HEIGHT_RATIO);
     return planTray(
@@ -321,7 +332,10 @@ export function renderBoard(container, config, onComplete) {
         : Math.max(0, metrics.trayWidth - scaledW) / 2) +
       piece.offsetX * scaledW * SCATTER_X;
     const visualY =
-      metrics.trayY + topGap + row * stepY + piece.offsetY * scaledH * SCATTER_Y;
+      metrics.trayY +
+      topGap +
+      row * stepY +
+      piece.offsetY * scaledH * SCATTER_Y;
 
     // Keep the scatter from pushing a piece out of the tray entirely.
     const clampedX = Math.min(
@@ -361,7 +375,7 @@ export function renderBoard(container, config, onComplete) {
 
     const plan = trayPlan(metrics);
     state.plan = plan;
-    trayEl.style.height = isSideBySide()
+    trayEl.style.height = isSideBySide(metrics)
       ? `${metrics.boardHeight}px`
       : `${plan.height}px`;
 

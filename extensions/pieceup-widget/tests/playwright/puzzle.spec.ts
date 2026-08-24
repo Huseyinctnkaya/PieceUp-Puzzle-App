@@ -314,3 +314,91 @@ test("omits the intro entirely when the merchant wrote none", async ({
   // An empty heading block would push the puzzle down for no reason.
   await expect(page.locator(".pieceup-intro")).toHaveCount(0);
 });
+
+/**
+ * The stylesheet and the layout code must not disagree about where the tray is.
+ *
+ * The widget runs inside whatever theme the merchant uses, so its CSS can be
+ * overridden, cached at an older version, or simply lose to a more specific
+ * rule. When that happened the board stacked above the tray while the layout
+ * code -- reading the breakpoint instead of the page -- still measured as
+ * though the tray sat beside it, and every piece was positioned into empty
+ * space outside the card.
+ */
+test("survives a theme that overrides the stage layout", async ({ page }) => {
+  await page.route("**/apps/pieceup/config", (route) =>
+    route.fulfill({
+      json: {
+        config: {
+          imageUrl: WIDE_IMAGE,
+          pieceCount: 9,
+          triggerMode: "BUTTON",
+          triggerPage: "ALL",
+          triggerDelaySeconds: null,
+        },
+      },
+    }),
+  );
+  await page.route("**/apps/pieceup/status*", (route) =>
+    route.fulfill({ json: { alreadyPlayed: false } }),
+  );
+
+  // Wide enough that the breakpoint says "side by side", while the page's own
+  // CSS stacks them anyway -- exactly the mismatch a real theme can cause.
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto(fixtureUrl);
+  await page.addStyleTag({
+    content: [
+      // Kills the pieces' coordinate space: without a positioned stage they
+      // resolve against the fixed, viewport-sized overlay instead, and land
+      // outside the popup entirely.
+      // Strips the positioned ancestors out from under the pieces, so they
+      // resolve against the viewport-sized overlay: the exact failure a
+      // merchant hit, where every piece landed outside the popup.
+      ".pieceup-stage { position: static !important; }",
+      ".pieceup-popup { position: static !important; }",
+      ".pieceup-stage { flex-direction: column !important; }",
+      ".pieceup-board { flex: none !important; width: 100% !important; }",
+      ".pieceup-tray { flex: none !important; width: 100% !important; }",
+    ].join("\n"),
+  });
+  await page.evaluate(() => {
+    const w = window as unknown as {
+      __initPieceUp: (root: HTMLElement | null) => Promise<void>;
+    };
+    return w.__initPieceUp(document.getElementById("pieceup-root"));
+  });
+  await page.click(".pieceup-trigger");
+  await page.click(".pieceup-start");
+  await waitForPiecesSettled(page);
+
+  // The inline declaration has to beat the theme's !important rule, or the
+  // pieces lose their coordinate space and the assertion below is vacuous.
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          getComputedStyle(document.querySelector(".pieceup-stage")!).position,
+      ),
+    )
+    .toBe("relative");
+
+  const strays = await page.evaluate(() => {
+    const card = document
+      .querySelector(".pieceup-card")!
+      .getBoundingClientRect();
+    return Array.from(document.querySelectorAll(".pieceup-piece")).filter(
+      (piece) => {
+        const rect = piece.getBoundingClientRect();
+        return (
+          rect.right < card.left ||
+          rect.left > card.right ||
+          rect.bottom < card.top ||
+          rect.top > card.bottom
+        );
+      },
+    ).length;
+  });
+
+  expect(strays).toBe(0);
+});
