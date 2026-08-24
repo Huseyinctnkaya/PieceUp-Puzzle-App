@@ -8,6 +8,7 @@ import {
 } from "../models/playRecord.server";
 import { issueRewardCode } from "../services/rewardService.server";
 import { getSubscription } from "../services/billing.server";
+import { recordStat } from "../models/puzzleStat.server";
 
 export async function action({ request }: ActionFunctionArgs) {
   if (request.method !== "POST") {
@@ -51,6 +52,12 @@ export async function action({ request }: ActionFunctionArgs) {
     });
   }
 
+  // Counted here, after the replay check but before the plan limit: the
+  // shopper genuinely finished the puzzle, and whether they end up with a code
+  // is a separate question. Keeping the two apart is what makes
+  // "completed minus rewarded" mean "finished but the plan had nothing left".
+  await recordStat(session.shop, config.id, "completed");
+
   // Checked before issuing, not after: issueRewardCode creates a real,
   // redeemable Shopify discount, so going over the plan's allowance has to be
   // stopped before money is on the line.
@@ -87,6 +94,8 @@ export async function action({ request }: ActionFunctionArgs) {
       headers: { "Content-Type": "application/json" },
     });
   }
+
+  await recordStat(session.shop, config.id, "rewarded");
 
   return new Response(JSON.stringify({ discountCode: code }), {
     status: 200,

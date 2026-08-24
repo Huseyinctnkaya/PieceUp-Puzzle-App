@@ -1,11 +1,20 @@
 import { getIdentityKey } from "./identity.js";
-import { fetchConfig, fetchStatus, submitCompletion } from "./api.js";
+import {
+  fetchConfig,
+  fetchStatus,
+  submitCompletion,
+  trackOpen,
+} from "./api.js";
 import { PuzzleBoard, buildPieces } from "./puzzle.js";
 
 export async function initPieceUp(root) {
   const config = await fetchConfig();
   if (!config) return;
-  if (config.triggerPage !== "ALL" && config.triggerPage !== root.dataset.triggerPage) return;
+  if (
+    config.triggerPage !== "ALL" &&
+    config.triggerPage !== root.dataset.triggerPage
+  )
+    return;
 
   const identityKey = getIdentityKey(root);
   const alreadyPlayed = await fetchStatus(identityKey);
@@ -47,6 +56,7 @@ function buildPopup(root, config, alreadyPlayed, identityKey) {
 
   function open() {
     overlay.hidden = false;
+    trackOpen();
     if (alreadyPlayed) {
       renderMessage(content, "Zaten katıldın, teşekkürler!");
     } else {
@@ -109,7 +119,13 @@ function renderPuzzle(container, config, onComplete) {
   const boardWidth = cols * cellWidth;
   const boardHeight = rows * cellHeight;
   const board = new PuzzleBoard({ rows, cols, cellWidth, cellHeight });
-  const pieces = buildPieces(rows, cols, cellWidth, cellHeight, config.imageUrl);
+  const pieces = buildPieces(
+    rows,
+    cols,
+    cellWidth,
+    cellHeight,
+    config.imageUrl,
+  );
 
   container.innerHTML = "";
   const boardEl = document.createElement("div");
@@ -141,7 +157,11 @@ function renderPuzzle(container, config, onComplete) {
       const pieceRect = pieceEl.getBoundingClientRect();
       const dropX = pieceRect.left - boardRect.left + pieceRect.width / 2;
       const dropY = pieceRect.top - boardRect.top + pieceRect.height / 2;
-      const { correct, complete } = board.attemptDrop(piece.index, dropX, dropY);
+      const { correct, complete } = board.attemptDrop(
+        piece.index,
+        dropX,
+        dropY,
+      );
       if (correct) {
         // Snap to the exact target cell position rather than wherever the
         // pointer happened to release within the tolerance zone.

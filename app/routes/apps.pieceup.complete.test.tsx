@@ -17,6 +17,9 @@ vi.mock("../services/rewardService.server", () => ({
 vi.mock("../services/billing.server", () => ({
   getSubscription: vi.fn(),
 }));
+vi.mock("../models/puzzleStat.server", () => ({
+  recordStat: vi.fn(),
+}));
 
 import { authenticate } from "../shopify.server";
 import { getActivePuzzleConfig } from "../models/puzzleConfig.server";
@@ -27,6 +30,7 @@ import {
 } from "../models/playRecord.server";
 import { issueRewardCode } from "../services/rewardService.server";
 import { getSubscription } from "../services/billing.server";
+import { recordStat } from "../models/puzzleStat.server";
 import { action } from "./apps.pieceup.complete";
 
 beforeEach(() => {
@@ -36,6 +40,7 @@ beforeEach(() => {
     admin: {},
   } as any);
   vi.mocked(getActivePuzzleConfig).mockResolvedValue({
+    id: "puzzle-1",
     rewardType: "PERCENTAGE_DISCOUNT",
     rewardValue: "10",
     playLimitType: "ONCE_EVER",
@@ -51,6 +56,7 @@ beforeEach(() => {
     currentPeriodEnd: null,
   } as any);
   vi.mocked(countRewardsThisMonth).mockResolvedValue(0);
+  vi.mocked(recordStat).mockResolvedValue(undefined);
 });
 
 function makeRequest(body: unknown) {
@@ -97,6 +103,44 @@ describe("apps.pieceup.complete action", () => {
     // recorded, so hitting the cap costs the merchant nothing.
     expect(issueRewardCode).not.toHaveBeenCalled();
     expect(recordCompletion).not.toHaveBeenCalled();
+    // But the finish still counts, and the reward doesn't — that gap is how
+    // the stats page shows the merchant what the limit cost them.
+    expect(recordStat).toHaveBeenCalledWith(
+      "shop-a.myshopify.com",
+      "puzzle-1",
+      "completed",
+    );
+    expect(recordStat).not.toHaveBeenCalledWith(
+      "shop-a.myshopify.com",
+      "puzzle-1",
+      "rewarded",
+    );
+  });
+
+  it("counts both completion and reward on a successful play", async () => {
+    await action({
+      request: makeRequest({ identityKey: "device:xyz" }),
+    } as any);
+    expect(recordStat).toHaveBeenCalledWith(
+      "shop-a.myshopify.com",
+      "puzzle-1",
+      "completed",
+    );
+    expect(recordStat).toHaveBeenCalledWith(
+      "shop-a.myshopify.com",
+      "puzzle-1",
+      "rewarded",
+    );
+  });
+
+  it("counts nothing when the identity already played", async () => {
+    vi.mocked(hasAlreadyPlayed).mockResolvedValue(true);
+    await action({
+      request: makeRequest({ identityKey: "device:xyz" }),
+    } as any);
+    // A replay attempt isn't a fresh completion; counting it would inflate
+    // the funnel with traffic that never played.
+    expect(recordStat).not.toHaveBeenCalled();
   });
 
   it("still issues a reward on an unmetered plan", async () => {

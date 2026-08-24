@@ -54,6 +54,30 @@ model PuzzleConfig {
   @@index([shopDomain])
 }
 
+// Daily funnel counters, one row per shop/puzzle/day.
+//
+// Deliberately aggregated rather than one row per event: a busy shop would
+// otherwise write a row on every popup open, and the only thing the stats page
+// asks of this data is "how many per day", which counters answer directly and
+// with bounded growth.
+//
+// The three stages are distinct on purpose. `completed` minus `rewarded` is
+// the number of shoppers who finished the puzzle but got nothing — which
+// happens when the shop's plan ran out of monthly rewards, and is exactly the
+// thing a merchant needs to see.
+model PuzzleStat {
+  id         String @id @default(cuid())
+  shopDomain String
+  puzzleId   String
+  date       String // YYYY-MM-DD, matching PlayRecord.playDate
+  opened     Int    @default(0)
+  completed  Int    @default(0)
+  rewarded   Int    @default(0)
+
+  @@unique([shopDomain, puzzleId, date])
+  @@index([shopDomain, date])
+}
+
 // Per-shop onboarding state. The setup guide's first two steps are derived
 // from real data (does a puzzle exist / is one active), but "did the merchant
 // turn on the theme app embed" can't be read back from the Admin API without
