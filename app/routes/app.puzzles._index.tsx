@@ -36,14 +36,15 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 const DELETE_ERROR_MESSAGES: Record<string, string> = {
-  cannot_delete_active_puzzle: "Aktif bir puzzle silinemez. Önce pasife alın.",
-  not_found: "Puzzle bulunamadı.",
-  delete_failed: "Puzzle silinemedi.",
+  cannot_delete_active_puzzle:
+    "An active puzzle can't be deleted. Deactivate it first.",
+  not_found: "Puzzle not found.",
+  delete_failed: "Couldn't delete the puzzle.",
 };
 
 function rewardSummary(rewardType: string, rewardValue: string) {
-  if (rewardType === "PERCENTAGE_DISCOUNT") return `%${rewardValue} indirim`;
-  if (rewardType === "FREE_PRODUCT_DISCOUNT") return "Ücretsiz ürün";
+  if (rewardType === "PERCENTAGE_DISCOUNT") return `${rewardValue}% off`;
+  if (rewardType === "FREE_PRODUCT_DISCOUNT") return "Free product";
   return rewardType;
 }
 
@@ -55,12 +56,15 @@ export default function PuzzlesList() {
   useEffect(() => {
     if (!deleteFetcher.data || typeof deleteFetcher.data !== "object") return;
     if ("deleted" in deleteFetcher.data) {
-      shopify.toast.show("Puzzle silindi");
+      shopify.toast.show("Puzzle deleted");
     } else if ("error" in deleteFetcher.data) {
       const key = String(deleteFetcher.data.error);
-      shopify.toast.show(DELETE_ERROR_MESSAGES[key] ?? "Puzzle silinemedi", {
-        isError: true,
-      });
+      shopify.toast.show(
+        DELETE_ERROR_MESSAGES[key] ?? "Couldn't delete the puzzle",
+        {
+          isError: true,
+        },
+      );
     }
   }, [deleteFetcher.data, shopify]);
 
@@ -68,41 +72,41 @@ export default function PuzzlesList() {
     <s-page>
       <s-stack gap="large">
         <s-grid gridTemplateColumns="1fr auto" gap="base" alignItems="center">
-          <s-heading>Puzzle&apos;lar</s-heading>
+          <s-heading>Puzzles</s-heading>
           <s-button variant="primary" href="/app/puzzles/new">
-            Puzzle oluştur
+            Create puzzle
           </s-button>
         </s-grid>
 
         {puzzles.length === 0 ? (
           <s-section>
             <s-stack gap="base" alignItems="center">
-              <s-heading>Henüz puzzle yok</s-heading>
+              <s-heading>No puzzles yet</s-heading>
               <s-text color="subdued">
-                İlk puzzle&apos;ınızı oluşturarak müşterilerinize ödüllü bir
-                bulmaca sunmaya başlayın.
+                Create your first puzzle to start offering shoppers a rewarded
+                game.
               </s-text>
               <s-button variant="primary" href="/app/puzzles/new">
-                Puzzle oluştur
+                Create puzzle
               </s-button>
             </s-stack>
           </s-section>
         ) : (
           <s-section padding="none">
             <s-box padding="base">
-              <s-heading>Puzzle&apos;larınız</s-heading>
+              <s-heading>Your puzzles</s-heading>
             </s-box>
 
             <s-table variant="auto">
               <s-table-header-row>
-                <s-table-header listSlot="primary">Ad</s-table-header>
-                <s-table-header listSlot="inline">Durum</s-table-header>
+                <s-table-header listSlot="primary">Name</s-table-header>
+                <s-table-header listSlot="inline">Status</s-table-header>
                 {/* No format="numeric" here: it right-aligns the header text,
                     but the cell below holds a badge that stays left-aligned,
                     so the two ended up visibly out of line. */}
-                <s-table-header listSlot="labeled">Parça</s-table-header>
-                <s-table-header listSlot="labeled">Ödül</s-table-header>
-                <s-table-header>İşlemler</s-table-header>
+                <s-table-header listSlot="labeled">Pieces</s-table-header>
+                <s-table-header listSlot="labeled">Reward</s-table-header>
+                <s-table-header>Actions</s-table-header>
               </s-table-header-row>
               <s-table-body>
                 {puzzles.map((puzzle) => (
@@ -112,7 +116,7 @@ export default function PuzzlesList() {
                     </s-table-cell>
                     <s-table-cell>
                       <s-badge tone={puzzle.isActive ? "success" : "neutral"}>
-                        {puzzle.isActive ? "Aktif" : "Pasif"}
+                        {puzzle.isActive ? "Active" : "Inactive"}
                       </s-badge>
                     </s-table-cell>
                     <s-table-cell>
@@ -124,12 +128,12 @@ export default function PuzzlesList() {
                       </s-text>
                     </s-table-cell>
                     <s-table-cell>
-                      {/* Left-aligned to sit under the "İşlemler" header —
+                      {/* Left-aligned to sit under the "Actions" header —
                           pushing the buttons to the end left the header
                           stranded at the far side of a wide column. */}
                       <s-stack direction="inline" gap="small-200">
                         <s-button href={`/app/puzzles/${puzzle.id}`}>
-                          Düzenle
+                          Edit
                         </s-button>
                         <s-button
                           tone="critical"
@@ -137,22 +141,19 @@ export default function PuzzlesList() {
                           commandFor={`delete-${puzzle.id}`}
                           command="--show"
                         >
-                          Sil
+                          Delete
                         </s-button>
                       </s-stack>
 
                       <s-modal
                         id={`delete-${puzzle.id}`}
-                        heading="Puzzle silinsin mi?"
+                        heading="Delete this puzzle?"
                       >
                         <s-stack gap="base">
                           <s-text>
-                            &quot;{puzzle.name}&quot; adlı puzzle kalıcı olarak
-                            silinecek.
+                            “{puzzle.name}” will be permanently deleted.
                           </s-text>
-                          <s-text tone="caution">
-                            Bu işlem geri alınamaz.
-                          </s-text>
+                          <s-text tone="caution">This can’t be undone.</s-text>
                         </s-stack>
                         <s-button
                           slot="primary-action"
@@ -167,14 +168,14 @@ export default function PuzzlesList() {
                             )
                           }
                         >
-                          Sil
+                          Delete
                         </s-button>
                         <s-button
                           slot="secondary-actions"
                           commandFor={`delete-${puzzle.id}`}
                           command="--hide"
                         >
-                          Vazgeç
+                          Cancel
                         </s-button>
                       </s-modal>
                     </s-table-cell>

@@ -41,7 +41,7 @@ function buildPopup(root, config, alreadyPlayed, identityKey) {
   const closeButton = document.createElement("button");
   closeButton.type = "button";
   closeButton.className = "pieceup-close";
-  closeButton.setAttribute("aria-label", "Kapat");
+  closeButton.setAttribute("aria-label", "Close");
   closeButton.textContent = "×";
   closeButton.addEventListener("click", close);
   popupBox.appendChild(closeButton);
@@ -58,23 +58,26 @@ function buildPopup(root, config, alreadyPlayed, identityKey) {
     overlay.hidden = false;
     trackOpen();
     if (alreadyPlayed) {
-      renderMessage(content, "Zaten katıldın, teşekkürler!");
+      renderMessage(content, "You've already played — thanks!");
     } else {
       renderPuzzle(content, config, async () => {
         try {
           const code = await submitCompletion(identityKey);
-          renderMessage(content, `Tebrikler! Kodun: ${code}`);
+          renderMessage(content, `Congratulations! Your code: ${code}`);
         } catch (err) {
           // The shop hit its plan's monthly reward allowance. That's not the
           // shopper's fault and retrying won't help, so don't tell them to.
           if (err && err.message === "reward_limit_reached") {
             renderMessage(
               content,
-              "Bu kampanyanın ödülleri şimdilik tükendi. Daha sonra tekrar dene!",
+              "This campaign is out of rewards for now. Check back later!",
             );
             return;
           }
-          renderMessage(content, "Ödülün oluşturulamadı, lütfen tekrar dene.");
+          renderMessage(
+            content,
+            "Couldn't create your reward, please try again.",
+          );
         }
       });
     }
@@ -94,7 +97,7 @@ function buildPopup(root, config, alreadyPlayed, identityKey) {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "pieceup-trigger";
-    button.setAttribute("aria-label", "Bulmacayı aç");
+    button.setAttribute("aria-label", "Open the puzzle");
     button.textContent = "🧩";
     button.addEventListener("click", open);
     root.appendChild(button);

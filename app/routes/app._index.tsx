@@ -117,34 +117,32 @@ export default function Dashboard() {
 
   const steps: Step[] = [
     {
-      label: "İlk puzzle'ınızı oluşturun",
+      label: "Create your first puzzle",
       description:
-        "Bir görsel yükleyin, parça sayısını ve ödülü belirleyin. Puzzle'ınız birkaç dakikada hazır.",
+        "Upload an image, pick a piece count and a reward. Your puzzle is ready in minutes.",
       done: hasPuzzle,
       action: (
         <s-button variant="primary" href="/app/puzzles/new">
-          Puzzle oluştur
+          Create puzzle
         </s-button>
       ),
     },
     {
-      label: "Bir puzzle'ı aktif edin",
+      label: "Activate a puzzle",
       description:
-        "Aynı anda yalnızca bir puzzle yayında olabilir. Yayınlamak istediğiniz puzzle'ı aktif edin.",
+        "Only one puzzle can be live at a time. Activate the one you want to run.",
       done: hasActivePuzzle,
-      action: (
-        <s-button href="/app/puzzles">Puzzle&apos;ları görüntüle</s-button>
-      ),
+      action: <s-button href="/app/puzzles">View puzzles</s-button>,
     },
     {
-      label: "Mağazanızda widget'ı etkinleştirin",
+      label: "Turn on the widget in your store",
       description:
-        "Puzzle'ın müşterilere görünmesi için tema düzenleyicisinden PieceUp app embed'ini açın.",
+        "Enable the PieceUp app embed in your theme editor so shoppers can see the puzzle.",
       done: embedDone,
       action: (
         <s-stack direction="inline" gap="small-200">
           <s-button href={themeEditorUrl} target="_blank">
-            Tema düzenleyiciyi aç
+            Open theme editor
           </s-button>
           <s-button
             variant="tertiary"
@@ -156,9 +154,7 @@ export default function Dashboard() {
               )
             }
           >
-            {embedDone
-              ? "Tamamlanmadı olarak işaretle"
-              : "Tamamlandı olarak işaretle"}
+            {embedDone ? "Mark as not done" : "Mark as done"}
           </s-button>
         </s-stack>
       ),
@@ -175,8 +171,7 @@ export default function Dashboard() {
         <s-stack gap="small-400">
           <s-heading>PieceUp</s-heading>
           <s-text color="subdued">
-            Mağazanız için sürükle-bırak bulmaca kampanyaları oluşturun ve
-            yönetin.
+            Create and manage drag-and-drop puzzle campaigns for your store.
           </s-text>
         </s-stack>
 
@@ -185,22 +180,23 @@ export default function Dashboard() {
             <s-grid gridTemplateColumns="1fr auto" gap="base">
               <s-stack gap="small-500">
                 <s-stack direction="inline" gap="small-200" alignItems="center">
-                  <s-heading>Kurulum rehberi</s-heading>
+                  <s-heading>Setup guide</s-heading>
                   <s-badge
                     tone={completed === steps.length ? "success" : "info"}
                   >
-                    {completed} / {steps.length} tamamlandı
+                    {completed} of {steps.length} completed
                   </s-badge>
                 </s-stack>
                 <s-text color="subdued">
-                  Uygulamanızı çalışır hale getirmek için bu adımları
-                  tamamlayın.
+                  Complete these steps to get your app up and running.
                 </s-text>
               </s-stack>
               <s-button
                 variant="tertiary"
                 icon={guideOpen ? "chevron-up" : "chevron-down"}
-                accessibilityLabel={guideOpen ? "Rehberi kapat" : "Rehberi aç"}
+                accessibilityLabel={
+                  guideOpen ? "Collapse guide" : "Expand guide"
+                }
                 onClick={() => setGuideOpen(!guideOpen)}
               ></s-button>
             </s-grid>
@@ -223,14 +219,14 @@ export default function Dashboard() {
                       />
                       <s-text type="strong">{step.label}</s-text>
                       {step.done ? (
-                        <s-badge tone="success">Tamamlandı</s-badge>
+                        <s-badge tone="success">Done</s-badge>
                       ) : null}
                     </s-stack>
                     <s-button
                       variant="tertiary"
                       icon={openStep === index ? "chevron-up" : "chevron-down"}
                       accessibilityLabel={
-                        openStep === index ? "Adımı kapat" : "Adımı aç"
+                        openStep === index ? "Collapse step" : "Expand step"
                       }
                       onClick={() =>
                         setOpenStep(openStep === index ? -1 : index)
@@ -269,37 +265,33 @@ export default function Dashboard() {
               fill the stretched grid item — the cards stayed as tall as their
               own copy and the buttons never lined up. */}
           <ActionCard
-            heading="Puzzle'lar"
-            body="Tüm puzzle'larınızı görüntüleyin, düzenleyin ve yönetin."
-            action={
-              <s-button href="/app/puzzles">
-                Puzzle&apos;ları görüntüle
-              </s-button>
-            }
+            heading="Puzzles"
+            body="View, edit and manage all your puzzles."
+            action={<s-button href="/app/puzzles">View puzzles</s-button>}
           />
 
           <ActionCard
-            heading="Yeni puzzle"
-            body="Görsel yükleyip yeni bir puzzle kampanyası oluşturun."
+            heading="New puzzle"
+            body="Upload an image and launch a new puzzle campaign."
             action={
               <s-button variant="primary" href="/app/puzzles/new">
-                Puzzle oluştur
+                Create puzzle
               </s-button>
             }
           />
 
           <ActionCard
-            heading="Mağaza widget'ı"
-            body="Puzzle'ın mağazanızda görünmesi için tema düzenleyicisinden app embed'ini etkinleştirin."
+            heading="Store widget"
+            body="Enable the app embed in your theme editor so the puzzle appears in your store."
             action={
               <s-button href={themeEditorUrl} target="_blank">
-                Tema düzenleyiciyi aç
+                Open theme editor
               </s-button>
             }
           />
         </s-grid>
 
-        <s-section heading="Yardıma mı ihtiyacınız var?">
+        <s-section heading="Need help?">
           <s-grid gridTemplateColumns="1fr 1fr" gap="base" alignItems="stretch">
             <s-grid-item>
               <s-box
@@ -317,11 +309,12 @@ export default function Dashboard() {
                     <s-icon type="email" />
                     {/* TODO: swap in the real support address once we have one */}
                     <s-link href="mailto:destek@example.com">
-                      <s-text type="strong">E-posta desteği</s-text>
+                      <s-text type="strong">Email support</s-text>
                     </s-link>
                   </s-stack>
                   <s-text color="subdued">
-                    Bize e-posta gönderin, en kısa sürede size dönüş yapalım.
+                    Send us an email and we’ll get back to you as soon as we
+                    can.
                   </s-text>
                 </s-stack>
               </s-box>
@@ -343,11 +336,11 @@ export default function Dashboard() {
                     <s-icon type="book-open" />
                     {/* TODO: swap in the real docs URL once we have one */}
                     <s-link href="#">
-                      <s-text type="strong">Dokümantasyon</s-text>
+                      <s-text type="strong">Documentation</s-text>
                     </s-link>
                   </s-stack>
                   <s-text color="subdued">
-                    Çözümleri ve kılavuzları dokümantasyonumuzda bulun.
+                    Find answers and guides in our documentation.
                   </s-text>
                 </s-stack>
               </s-box>

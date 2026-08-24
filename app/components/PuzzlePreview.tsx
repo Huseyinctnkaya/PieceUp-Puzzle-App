@@ -37,7 +37,7 @@ export function PuzzlePreview({
         <s-stack gap="small-200" alignItems="center">
           <s-icon type="image" tone="neutral" />
           <s-text color="subdued">
-            Önizleme için önce bir puzzle görseli yükleyin.
+            Upload a puzzle image to see the preview.
           </s-text>
         </s-stack>
       </s-box>
@@ -53,7 +53,7 @@ export function PuzzlePreview({
         border="base"
       >
         <s-stack gap="small-200" alignItems="center">
-          <s-spinner size="base" accessibilityLabel="Önizleme yükleniyor" />
+          <s-spinner size="base" accessibilityLabel="Loading preview" />
         </s-stack>
       </s-box>
     );
@@ -106,8 +106,8 @@ export function PuzzlePreview({
           </div>
         </s-stack>
         <s-text color="subdued">
-          Müşteriler sağdaki parçaları soldaki alana sürükleyerek bulmacayı
-          tamamlar.
+          Shoppers drag the pieces on the right onto the board to complete the
+          puzzle.
         </s-text>
       </s-stack>
     </s-box>

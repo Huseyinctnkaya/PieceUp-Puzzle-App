@@ -131,30 +131,30 @@ export default function PuzzleEdit() {
       typeof uploadFetcher.data === "object" &&
       "error" in uploadFetcher.data
     ) {
-      shopify.toast.show("Görsel yüklenemedi", { isError: true });
+      shopify.toast.show("Couldn’t upload the image", { isError: true });
     }
   }, [uploadFetcher.data, shopify]);
 
   useEffect(() => {
     if (!saveFetcher.data || typeof saveFetcher.data !== "object") return;
     if ("saved" in saveFetcher.data && saveFetcher.data.saved) {
-      shopify.toast.show("Puzzle kaydedildi");
+      shopify.toast.show("Puzzle saved");
       setBaseline(form);
       if (isNew)
         navigate(`/app/puzzles/${saveFetcher.data.id}`, { replace: true });
     } else if ("error" in saveFetcher.data) {
       if (saveFetcher.data.error === "already_active") {
         shopify.toast.show(
-          `Zaten aktif bir puzzle'ınız var: ${saveFetcher.data.activeName}. Önce onu pasife alın.`,
+          `“${saveFetcher.data.activeName}” is already active. Deactivate it first.`,
           { isError: true },
         );
       } else if (saveFetcher.data.error === "puzzle_limit_reached") {
         shopify.toast.show(
-          `Planınız ${saveFetcher.data.limit} puzzle ile sınırlı. Daha fazlası için planınızı yükseltin.`,
+          `Your plan is limited to ${saveFetcher.data.limit} puzzle(s). Upgrade for more.`,
           { isError: true },
         );
       } else {
-        shopify.toast.show("Kaydedilemedi", { isError: true });
+        shopify.toast.show("Couldn’t save", { isError: true });
       }
     }
     // `form` is deliberately excluded: this must snapshot the values that were
@@ -196,7 +196,7 @@ export default function PuzzleEdit() {
   // The image action buttons live inside s-drop-zone, whose own native click
   // listener opens a file picker. React 18 delegates events to the app root,
   // so any React onClick here runs after that listener has already fired —
-  // clicking "Sil" would delete the image *and* pop open a file dialog.
+  // clicking "Remove" would delete the image *and* pop open a file dialog.
   // Attaching natively to the buttons themselves puts us earlier in the bubble
   // path than s-drop-zone, so stopPropagation actually prevents it.
   useEffect(() => {
@@ -231,17 +231,17 @@ export default function PuzzleEdit() {
           onClick={handleSave}
           loading={saveFetcher.state !== "idle"}
         >
-          Kaydet
+          Save
         </button>
-        <button onClick={handleDiscard}>Vazgeç</button>
+        <button onClick={handleDiscard}>Discard</button>
       </SaveBar>
 
       <s-stack gap="large">
         <s-grid gridTemplateColumns="1fr auto" gap="base" alignItems="center">
           <s-stack direction="inline" gap="small-200" alignItems="center">
-            <s-heading>{isNew ? "Yeni puzzle" : "Puzzle düzenle"}</s-heading>
+            <s-heading>{isNew ? "New puzzle" : "Edit puzzle"}</s-heading>
             <s-badge tone={isActive ? "success" : "neutral"}>
-              {isActive ? "Aktif" : "Pasif"}
+              {isActive ? "Active" : "Inactive"}
             </s-badge>
           </s-stack>
           <s-stack direction="inline" gap="small-200" alignItems="center">
@@ -251,24 +251,24 @@ export default function PuzzleEdit() {
               tone={isActive ? "critical" : "neutral"}
               onClick={() => setField("isActive", String(!isActive))}
             >
-              {isActive ? "Pasife al" : "Aktif et"}
+              {isActive ? "Deactivate" : "Activate"}
             </s-button>
-            <s-button href="/app/puzzles">Puzzle&apos;lara dön</s-button>
+            <s-button href="/app/puzzles">Back to puzzles</s-button>
           </s-stack>
         </s-grid>
 
         <s-grid gridTemplateColumns="1fr 1fr" gap="base">
           <s-grid-item>
-            <s-section heading="Puzzle bilgileri">
+            <s-section heading="Puzzle details">
               <s-text-field
-                label="Puzzle adı"
+                label="Puzzle name"
                 value={form.name}
                 onChange={(event) =>
                   setField("name", event.currentTarget.value)
                 }
               />
 
-              {/* Hidden input backing the "Düzenle" button — the drop zone's
+              {/* Hidden input backing the "Replace" button — the drop zone's
                   own picker can't be opened programmatically. */}
               <input
                 ref={fileInputRef}
@@ -283,7 +283,7 @@ export default function PuzzleEdit() {
               />
 
               <s-drop-zone
-                label="Puzzle görseli"
+                label="Puzzle image"
                 accept="image/jpeg,image/png,image/webp"
                 error={uploadError}
                 onChange={handleDrop}
@@ -292,7 +292,7 @@ export default function PuzzleEdit() {
                   <s-stack gap="small-200" alignItems="center">
                     <s-thumbnail
                       src={form.imageUrl}
-                      alt="Puzzle görseli"
+                      alt="Puzzle image"
                       size="large"
                     />
                     {/* These two get native click listeners (see the effect
@@ -306,10 +306,10 @@ export default function PuzzleEdit() {
                         ref={editImageRef}
                         loading={uploadFetcher.state !== "idle"}
                       >
-                        Düzenle
+                        Replace
                       </s-button>
                       <s-button ref={removeImageRef} tone="critical">
-                        Sil
+                        Remove
                       </s-button>
                     </div>
                   </s-stack>
@@ -317,7 +317,7 @@ export default function PuzzleEdit() {
               </s-drop-zone>
 
               <s-select
-                label="Parça sayısı"
+                label="Pieces"
                 value={form.pieceCount}
                 onChange={(event) =>
                   setField("pieceCount", event.currentTarget.value)
@@ -331,23 +331,25 @@ export default function PuzzleEdit() {
               </s-select>
 
               <s-select
-                label="Ödül tipi"
+                label="Reward type"
                 value={form.rewardType}
                 onChange={(event) =>
                   setField("rewardType", event.currentTarget.value)
                 }
               >
-                <s-option value="PERCENTAGE_DISCOUNT">Yüzde indirim</s-option>
+                <s-option value="PERCENTAGE_DISCOUNT">
+                  Percentage discount
+                </s-option>
                 <s-option value="FREE_PRODUCT_DISCOUNT">
-                  Ücretsiz ürün indirimi
+                  Free product discount
                 </s-option>
               </s-select>
 
               <s-text-field
                 label={
                   form.rewardType === "PERCENTAGE_DISCOUNT"
-                    ? "İndirim yüzdesi"
-                    : "Ürün ID'si"
+                    ? "Discount percentage"
+                    : "Product ID"
                 }
                 value={form.rewardValue}
                 onChange={(event) =>
@@ -356,38 +358,38 @@ export default function PuzzleEdit() {
               />
 
               <s-select
-                label="Tetikleme modu"
+                label="Trigger"
                 value={form.triggerMode}
                 onChange={(event) =>
                   setField("triggerMode", event.currentTarget.value)
                 }
               >
-                <s-option value="BUTTON">Sadece buton</s-option>
-                <s-option value="AUTO">Otomatik açılır</s-option>
-                <s-option value="BOTH">İkisi de</s-option>
+                <s-option value="BUTTON">Button only</s-option>
+                <s-option value="AUTO">Opens automatically</s-option>
+                <s-option value="BOTH">Both</s-option>
               </s-select>
 
               <s-select
-                label="Hangi sayfada gösterilsin"
+                label="Show on"
                 value={form.triggerPage}
                 onChange={(event) =>
                   setField("triggerPage", event.currentTarget.value)
                 }
               >
-                <s-option value="ALL">Tüm sayfalar</s-option>
-                <s-option value="CART">Sepet</s-option>
-                <s-option value="PRODUCT">Ürün</s-option>
+                <s-option value="ALL">All pages</s-option>
+                <s-option value="CART">Cart</s-option>
+                <s-option value="PRODUCT">Product</s-option>
               </s-select>
 
               <s-select
-                label="Oynama sınırı"
+                label="Play limit"
                 value={form.playLimitType}
                 onChange={(event) =>
                   setField("playLimitType", event.currentTarget.value)
                 }
               >
-                <s-option value="ONCE_EVER">Kişi başı bir kez</s-option>
-                <s-option value="ONCE_PER_DAY">Günde bir kez</s-option>
+                <s-option value="ONCE_EVER">Once per person</s-option>
+                <s-option value="ONCE_PER_DAY">Once per day</s-option>
               </s-select>
             </s-section>
           </s-grid-item>
@@ -398,11 +400,11 @@ export default function PuzzleEdit() {
                 row's height, which is what gives the sticky element room to
                 travel. */}
             <div style={{ position: "sticky", top: "1rem" }}>
-              <s-section heading="Önizleme">
+              <s-section heading="Preview">
                 <s-stack gap="base">
                   <s-text color="subdued">
-                    Puzzle mağazanızda bu şekilde görünecek. Görseli veya parça
-                    sayısını değiştirdiğinizde önizleme anında güncellenir.
+                    This is how the puzzle will look in your store. The preview
+                    updates as you change the image or piece count.
                   </s-text>
                   <PuzzlePreview
                     imageUrl={form.imageUrl}

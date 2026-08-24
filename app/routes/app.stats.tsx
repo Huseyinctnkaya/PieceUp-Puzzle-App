@@ -43,7 +43,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
         ...row,
         // A puzzle can be deleted while its stats remain; showing the row is
         // more useful than dropping history, so it gets a placeholder name.
-        name: names.get(row.puzzleId) ?? "Silinmiş puzzle",
+        name: names.get(row.puzzleId) ?? "Deleted puzzle",
       }))
       .sort((a, b) => b.opened - a.opened),
   };
@@ -51,7 +51,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 function percent(part: number, whole: number) {
   if (whole === 0) return "—";
-  return `%${Math.round((part / whole) * 100)}`;
+  return `${Math.round((part / whole) * 100)}%`;
 }
 
 function Metric({
@@ -98,7 +98,7 @@ function DailyChart({
         return (
           <div
             key={day.date}
-            title={`${day.date}: ${day.opened} açılma, ${day.rewarded} ödül`}
+            title={`${day.date}: ${day.opened} opened, ${day.rewarded} rewarded`}
             style={{
               flex: 1,
               height: "100%",
@@ -144,23 +144,23 @@ export default function StatsPage() {
       <s-page>
         <s-stack gap="large">
           <s-stack gap="small-400">
-            <s-heading>İstatistikler</s-heading>
+            <s-heading>Analytics</s-heading>
             <s-text color="subdued">
-              Puzzle&apos;larınızın performansını takip edin.
+              Track how your puzzles are performing.
             </s-text>
           </s-stack>
 
           <s-section>
             <s-stack gap="base" alignItems="center">
               <s-icon type="lock" tone="neutral" />
-              <s-heading>İstatistikler Pro planına dahildir</s-heading>
+              <s-heading>Analytics is part of the Pro plan</s-heading>
               <s-text color="subdued">
-                Şu anda {data.planTitle} planındasınız. Kaç kişinin
-                puzzle&apos;ı açtığını, kaçının tamamladığını ve kodların
-                kullanılıp kullanılmadığını görmek için yükseltin.
+                You’re on the {data.planTitle} plan. Upgrade to see how many
+                shoppers opened the puzzle, how many finished it, and whether
+                their codes got used.
               </s-text>
               <s-button variant="primary" href="/app/plan">
-                Planları görüntüle
+                View plans
               </s-button>
             </s-stack>
           </s-section>
@@ -176,52 +176,55 @@ export default function StatsPage() {
     <s-page>
       <s-stack gap="large">
         <s-stack gap="small-400">
-          <s-heading>İstatistikler</s-heading>
+          <s-heading>Analytics</s-heading>
           <s-text color="subdued">
-            Puzzle&apos;larınızın performansını takip edin.
+            Track how your puzzles are performing.
           </s-text>
         </s-stack>
 
         {unrewarded > 0 ? (
-          <s-banner tone="warning" heading="Ödülsüz kalan tamamlamalar var">
+          <s-banner
+            tone="warning"
+            heading="Some finishers went away empty-handed"
+          >
             <s-text>
-              {unrewarded} kişi puzzle&apos;ı bitirdi ama aylık ödül limitiniz
-              dolduğu için kod alamadı. Planınızı yükselterek bu müşterileri
-              kaçırmayı bırakabilirsiniz.
+              {unrewarded} shoppers finished the puzzle but got no code, because
+              your monthly reward limit was used up. Upgrade to stop losing
+              them.
             </s-text>
           </s-banner>
         ) : null}
 
-        <s-section heading="Genel">
+        <s-section heading="Overview">
           <s-grid
             gridTemplateColumns="1fr 1fr 1fr 1fr"
             gap="base"
             alignItems="stretch"
           >
-            <Metric label="Açılma" value={String(totals.opened)} />
+            <Metric label="Opened" value={String(totals.opened)} />
             <Metric
-              label="Tamamlama"
+              label="Completed"
               value={String(totals.completed)}
-              hint={`Açılanların ${percent(totals.completed, totals.opened)}'i`}
+              hint={`${percent(totals.completed, totals.opened)} of opens`}
             />
             <Metric
-              label="Verilen ödül"
+              label="Rewards given"
               value={String(totals.rewarded)}
-              hint={`Tamamlayanların ${percent(totals.rewarded, totals.completed)}'i`}
+              hint={`${percent(totals.rewarded, totals.completed)} of finishers`}
             />
             <Metric
-              label="Kullanılan kod"
-              value={redemptions ? String(redemptions.redeemed) : "Bilinmiyor"}
+              label="Codes redeemed"
+              value={redemptions ? String(redemptions.redeemed) : "Unknown"}
               hint={
                 redemptions
-                  ? `Verilenlerin ${percent(redemptions.redeemed, redemptions.issued)}'i`
-                  : "Shopify'dan okunamadı"
+                  ? `${percent(redemptions.redeemed, redemptions.issued)} of codes given`
+                  : "Couldn’t read from Shopify"
               }
             />
           </s-grid>
         </s-section>
 
-        <s-section heading={`Son ${rangeDays} gün`}>
+        <s-section heading={`Last ${rangeDays} days`}>
           <s-stack gap="base">
             <s-stack direction="inline" gap="base" alignItems="center">
               <s-stack direction="inline" gap="small-200" alignItems="center">
@@ -233,7 +236,7 @@ export default function StatsPage() {
                     borderRadius: 2,
                   }}
                 />
-                <s-text color="subdued">Açılma</s-text>
+                <s-text color="subdued">Opened</s-text>
               </s-stack>
               <s-stack direction="inline" gap="small-200" alignItems="center">
                 <div
@@ -244,7 +247,7 @@ export default function StatsPage() {
                     borderRadius: 2,
                   }}
                 />
-                <s-text color="subdued">Verilen ödül</s-text>
+                <s-text color="subdued">Rewards given</s-text>
               </s-stack>
             </s-stack>
 
@@ -259,24 +262,24 @@ export default function StatsPage() {
 
         <s-section padding="none">
           <s-box padding="base">
-            <s-heading>Puzzle bazında</s-heading>
+            <s-heading>By puzzle</s-heading>
           </s-box>
 
           {perPuzzle.length === 0 ? (
             <s-box padding="base">
               <s-text color="subdued">
-                Henüz veri yok. Puzzle&apos;ınız mağazanızda görüntülendikçe
-                burası dolacak.
+                No data yet. This fills in as shoppers see your puzzle in your
+                store.
               </s-text>
             </s-box>
           ) : (
             <s-table variant="auto">
               <s-table-header-row>
                 <s-table-header listSlot="primary">Puzzle</s-table-header>
-                <s-table-header listSlot="labeled">Açılma</s-table-header>
-                <s-table-header listSlot="labeled">Tamamlama</s-table-header>
-                <s-table-header listSlot="labeled">Ödül</s-table-header>
-                <s-table-header listSlot="inline">Dönüşüm</s-table-header>
+                <s-table-header listSlot="labeled">Opened</s-table-header>
+                <s-table-header listSlot="labeled">Completed</s-table-header>
+                <s-table-header listSlot="labeled">Rewarded</s-table-header>
+                <s-table-header listSlot="inline">Conversion</s-table-header>
               </s-table-header-row>
               <s-table-body>
                 {perPuzzle.map((row) => (

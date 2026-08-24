@@ -86,7 +86,7 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 function formatPrice(price: number) {
-  return price === 0 ? "Ücretsiz" : `$${price.toFixed(2)}`;
+  return price === 0 ? "Free" : `$${price.toFixed(2)}`;
 }
 
 export default function PlanPage() {
@@ -108,9 +108,9 @@ export default function PlanPage() {
       // would try to load inside the embedded frame, which Shopify blocks.
       open(planFetcher.data.confirmationUrl, "_top");
     } else if ("downgraded" in planFetcher.data) {
-      shopify.toast.show("Aboneliğiniz iptal edildi, Free plana geçtiniz");
+      shopify.toast.show("Subscription cancelled — you're on the Free plan");
     } else if ("error" in planFetcher.data) {
-      shopify.toast.show("İşlem tamamlanamadı, lütfen tekrar deneyin", {
+      shopify.toast.show("Something went wrong, please try again", {
         isError: true,
       });
     }
@@ -134,64 +134,67 @@ export default function PlanPage() {
         <s-stack gap="small-400">
           <s-heading>Plan</s-heading>
           <s-text color="subdued">
-            Planınızı görüntüleyin ve mağazanızın büyümesine göre yükseltin.
+            See your plan and upgrade as your store grows.
           </s-text>
         </s-stack>
 
         {overRewardLimit ? (
-          <s-banner tone="warning" heading="Aylık ödül limitiniz doldu">
+          <s-banner
+            tone="warning"
+            heading="You’ve hit your monthly reward limit"
+          >
             <s-text>
-              Bu ay {rewardLimit} ödülün tamamı dağıtıldı. Ay sonuna kadar yeni
-              ödül verilemez — daha fazlası için planınızı yükseltin.
+              All {rewardLimit} rewards for this month have been handed out. No
+              new rewards until the month resets — upgrade for more.
             </s-text>
           </s-banner>
         ) : null}
 
-        <s-section heading="Mevcut planınız">
+        <s-section heading="Your plan">
           <s-stack gap="base">
             <s-stack direction="inline" gap="small-200" alignItems="center">
               <s-heading>{currentPlan.title}</s-heading>
               <s-badge tone={currentPlan.price === 0 ? "neutral" : "success"}>
                 {formatPrice(currentPlan.price)}
-                {currentPlan.price === 0 ? "" : " / ay"}
+                {currentPlan.price === 0 ? "" : " / month"}
               </s-badge>
               {trialDays ? (
-                <s-badge tone="info">{trialDays} günlük deneme</s-badge>
+                <s-badge tone="info">{trialDays}-day trial</s-badge>
               ) : null}
             </s-stack>
 
             {currentPeriodEnd ? (
               <s-text color="subdued">
-                Sonraki faturalandırma:{" "}
-                {new Date(currentPeriodEnd).toLocaleDateString("tr-TR")}
+                Next billed on{" "}
+                {new Date(currentPeriodEnd).toLocaleDateString("en-US")}
               </s-text>
             ) : null}
 
             <s-divider />
 
             <s-stack gap="small-200">
-              <s-text type="strong">Bu ayki kullanımınız</s-text>
+              <s-text type="strong">This month’s usage</s-text>
               <s-text color="subdued">
-                Ödül: {rewardsThisMonth}
+                Rewards: {rewardsThisMonth}
                 {rewardLimit === null
-                  ? " (sınırsız)"
-                  : ` / ${rewardLimit}${rewardsLeft !== null ? ` — ${rewardsLeft} hakkınız kaldı` : ""}`}
+                  ? " (unlimited)"
+                  : ` / ${rewardLimit}${rewardsLeft !== null ? ` — ${rewardsLeft} left` : ""}`}
               </s-text>
               <s-text color="subdued">
-                Puzzle: {puzzleCount}
+                Puzzles: {puzzleCount}
                 {currentPlan.puzzleLimit === null
-                  ? " (sınırsız)"
+                  ? " (unlimited)"
                   : ` / ${currentPlan.puzzleLimit}`}
               </s-text>
             </s-stack>
           </s-stack>
         </s-section>
 
-        <s-section heading="Planlar">
+        <s-section heading="Plans">
           <s-stack gap="base">
             <s-text color="subdued">
-              Ücretli planlar {TRIAL_DAYS} gün ücretsiz denenebilir. Ücret
-              Shopify faturanıza yansır.
+              Paid plans include a {TRIAL_DAYS}-day free trial. Charges appear
+              on your Shopify invoice.
             </s-text>
 
             {/* stretch + blockSize 100% below: without both, each card is only
@@ -228,12 +231,12 @@ export default function PlanPage() {
                           >
                             <s-heading>{plan.title}</s-heading>
                             {isCurrent ? (
-                              <s-badge tone="success">Mevcut</s-badge>
+                              <s-badge tone="success">Current</s-badge>
                             ) : null}
                           </s-stack>
                           <s-text type="strong">
                             {formatPrice(plan.price)}
-                            {isFree ? "" : " / ay"}
+                            {isFree ? "" : " / month"}
                           </s-text>
                           <s-unordered-list>
                             {plan.features.map((feature) => (
@@ -243,7 +246,7 @@ export default function PlanPage() {
                         </s-stack>
 
                         {isCurrent ? (
-                          <s-button disabled>Kullanımda</s-button>
+                          <s-button disabled>Current plan</s-button>
                         ) : isFree ? (
                           // Dropping to Free means cancelling the subscription
                           // outright — there's no $0 charge to switch to.
@@ -260,7 +263,7 @@ export default function PlanPage() {
                               )
                             }
                           >
-                            Free plana dön
+                            Switch to Free
                           </s-button>
                         ) : (
                           <s-button
@@ -275,8 +278,8 @@ export default function PlanPage() {
                             }
                           >
                             {currentPlan.price > plan.price
-                              ? "Bu plana geç"
-                              : "Yükselt"}
+                              ? "Switch to this plan"
+                              : "Upgrade"}
                           </s-button>
                         )}
                       </s-stack>
