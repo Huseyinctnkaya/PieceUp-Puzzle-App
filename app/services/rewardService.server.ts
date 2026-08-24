@@ -1,6 +1,9 @@
 import type { AdminApiContext } from "@shopify/shopify-app-react-router/server";
 import { randomInt } from "node:crypto";
 
+/** The shape Shopify returns for GraphQL userErrors. */
+type UserError = { field?: string[] | null; message: string };
+
 const DISCOUNT_CODE_CREATE = `#graphql
   mutation discountCodeBasicCreate($basicCodeDiscount: DiscountCodeBasicInput!) {
     discountCodeBasicCreate(basicCodeDiscount: $basicCodeDiscount) {
@@ -24,14 +27,20 @@ function randomCode(prefix: string): string {
   return `${prefix}-${suffix}`;
 }
 
-export async function issueRewardCode(admin: AdminApiContext, reward: RewardConfig): Promise<string> {
+export async function issueRewardCode(
+  admin: AdminApiContext,
+  reward: RewardConfig,
+): Promise<string> {
   const code = randomCode("PIECEUP");
   const now = new Date();
   const endsAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
   const customerGets =
     reward.rewardType === "PERCENTAGE_DISCOUNT"
-      ? { value: { percentage: Number(reward.rewardValue) / 100 }, items: { all: true } }
+      ? {
+          value: { percentage: Number(reward.rewardValue) / 100 },
+          items: { all: true },
+        }
       : {
           value: { percentage: 1.0 },
           items: { products: { productsToAdd: [reward.rewardValue] } },
@@ -54,8 +63,13 @@ export async function issueRewardCode(admin: AdminApiContext, reward: RewardConf
 
   const json = await response.json();
   const userErrors = json.data?.discountCodeBasicCreate?.userErrors ?? [];
-  if (!json.data?.discountCodeBasicCreate?.codeDiscountNode || userErrors.length > 0) {
-    throw new Error(`Discount code creation failed: ${userErrors.map((e: any) => e.message).join(", ")}`);
+  if (
+    !json.data?.discountCodeBasicCreate?.codeDiscountNode ||
+    userErrors.length > 0
+  ) {
+    throw new Error(
+      `Discount code creation failed: ${userErrors.map((e: UserError) => e.message).join(", ")}`,
+    );
   }
   return code;
 }

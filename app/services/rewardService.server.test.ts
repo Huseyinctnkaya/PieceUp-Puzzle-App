@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+import type { AdminApiContext } from "@shopify/shopify-app-react-router/server";
 import { issueRewardCode } from "./rewardService.server";
 
 function jsonResponse(data: unknown) {
@@ -10,11 +11,14 @@ describe("issueRewardCode", () => {
     const admin = {
       graphql: vi.fn().mockResolvedValue(
         jsonResponse({
-          discountCodeBasicCreate: { codeDiscountNode: { id: "gid://1" }, userErrors: [] },
+          discountCodeBasicCreate: {
+            codeDiscountNode: { id: "gid://1" },
+            userErrors: [],
+          },
         }),
       ),
     };
-    const code = await issueRewardCode(admin as any, {
+    const code = await issueRewardCode(admin as unknown as AdminApiContext, {
       rewardType: "PERCENTAGE_DISCOUNT",
       rewardValue: "10",
     });
@@ -33,7 +37,10 @@ describe("issueRewardCode", () => {
       ),
     };
     await expect(
-      issueRewardCode(admin as any, { rewardType: "PERCENTAGE_DISCOUNT", rewardValue: "10" }),
+      issueRewardCode(admin as unknown as AdminApiContext, {
+        rewardType: "PERCENTAGE_DISCOUNT",
+        rewardValue: "10",
+      }),
     ).rejects.toThrow("Discount code creation failed");
   });
 
@@ -49,7 +56,10 @@ describe("issueRewardCode", () => {
       ),
     };
     await expect(
-      issueRewardCode(admin as any, { rewardType: "PERCENTAGE_DISCOUNT", rewardValue: "10" }),
+      issueRewardCode(admin as unknown as AdminApiContext, {
+        rewardType: "PERCENTAGE_DISCOUNT",
+        rewardValue: "10",
+      }),
     ).rejects.toThrow("Discount code creation failed");
   });
 });

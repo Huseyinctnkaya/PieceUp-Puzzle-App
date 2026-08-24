@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { AdminApiContext } from "@shopify/shopify-app-react-router/server";
 import { uploadPuzzleImage } from "./imageUpload.server";
 
 function jsonResponse(data: unknown) {
@@ -31,7 +32,12 @@ describe("uploadPuzzleImage", () => {
         .mockResolvedValueOnce(
           jsonResponse({
             fileCreate: {
-              files: [{ id: "gid://shopify/MediaImage/1", image: { url: "https://cdn.example/img.jpg" } }],
+              files: [
+                {
+                  id: "gid://shopify/MediaImage/1",
+                  image: { url: "https://cdn.example/img.jpg" },
+                },
+              ],
               userErrors: [],
             },
           }),
@@ -39,7 +45,10 @@ describe("uploadPuzzleImage", () => {
     };
 
     const file = new File(["data"], "puzzle.jpg", { type: "image/jpeg" });
-    const url = await uploadPuzzleImage(admin as any, file);
+    const url = await uploadPuzzleImage(
+      admin as unknown as AdminApiContext,
+      file,
+    );
     expect(url).toBe("https://cdn.example/img.jpg");
   });
 
@@ -55,7 +64,9 @@ describe("uploadPuzzleImage", () => {
       ),
     };
     const file = new File(["data"], "puzzle.jpg", { type: "image/jpeg" });
-    await expect(uploadPuzzleImage(admin as any, file)).rejects.toThrow("Staged upload failed");
+    await expect(
+      uploadPuzzleImage(admin as unknown as AdminApiContext, file),
+    ).rejects.toThrow("Staged upload failed");
   });
 
   it("throws without calling the network when the file exceeds 5MB", async () => {
@@ -63,14 +74,18 @@ describe("uploadPuzzleImage", () => {
     const oversized = new File([new Uint8Array(6 * 1024 * 1024)], "big.jpg", {
       type: "image/jpeg",
     });
-    await expect(uploadPuzzleImage(admin as any, oversized)).rejects.toThrow("file_too_large");
+    await expect(
+      uploadPuzzleImage(admin as unknown as AdminApiContext, oversized),
+    ).rejects.toThrow("file_too_large");
     expect(admin.graphql).not.toHaveBeenCalled();
   });
 
   it("throws without calling the network when the mime type is unsupported", async () => {
     const admin = { graphql: vi.fn() };
     const file = new File(["data"], "puzzle.gif", { type: "image/gif" });
-    await expect(uploadPuzzleImage(admin as any, file)).rejects.toThrow("unsupported_file_type");
+    await expect(
+      uploadPuzzleImage(admin as unknown as AdminApiContext, file),
+    ).rejects.toThrow("unsupported_file_type");
     expect(admin.graphql).not.toHaveBeenCalled();
   });
 });

@@ -8,7 +8,9 @@ import { test, expect } from "@playwright/test";
 // this path is relative to there, not the repo root.
 const fixtureUrl = "/tests/playwright/fixture.html";
 
-test("completes a 2x2 puzzle via pointer drag and shows the reward code", async ({ page }) => {
+test("completes a 2x2 puzzle via pointer drag and shows the reward code", async ({
+  page,
+}) => {
   await page.route("**/apps/pieceup/config", (route) =>
     route.fulfill({
       json: {
@@ -30,7 +32,14 @@ test("completes a 2x2 puzzle via pointer drag and shows the reward code", async 
   );
 
   await page.goto(fixtureUrl);
-  await page.evaluate(() => (window as any).__initPieceUp(document.getElementById("pieceup-root")));
+  // The fixture hangs initPieceUp off window so the test can start the widget
+  // on demand; declaring the property is what keeps this off `any`.
+  await page.evaluate(() => {
+    const w = window as unknown as {
+      __initPieceUp: (root: HTMLElement | null) => Promise<void>;
+    };
+    return w.__initPieceUp(document.getElementById("pieceup-root"));
+  });
 
   await page.click(".pieceup-trigger");
 
@@ -64,5 +73,7 @@ test("completes a 2x2 puzzle via pointer drag and shows the reward code", async 
     await page.mouse.up();
   }
 
-  await expect(page.locator(".pieceup-message")).toContainText("PIECEUP-TEST99");
+  await expect(page.locator(".pieceup-message")).toContainText(
+    "PIECEUP-TEST99",
+  );
 });
