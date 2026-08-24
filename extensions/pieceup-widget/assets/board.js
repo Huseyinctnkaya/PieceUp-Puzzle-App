@@ -1,4 +1,10 @@
-import { buildPieces, buildPiecePath, gridFor, planTray } from "./jigsaw.js";
+import {
+  buildPieces,
+  buildPiecePath,
+  gridFor,
+  planTray,
+  randomGenerator,
+} from "./jigsaw.js";
 import { PuzzleBoard } from "./puzzle.js";
 
 /** Movement below this is treated as a tap, not a drag. */
@@ -6,6 +12,8 @@ const DRAG_THRESHOLD = 5;
 /** How much of the board's height the tray may take. */
 const TRAY_HEIGHT_RATIO = 0.62;
 const TRAY_HEIGHT_MAX = 240;
+/** Must match the stylesheet's breakpoint, or the two would disagree. */
+const SIDE_BY_SIDE_MIN_WIDTH = 860;
 /** Tab height as a fraction of the cell — how pronounced the knobs are. */
 const TAB_RATIO = 0.2;
 
@@ -37,9 +45,63 @@ export function renderBoard(container, config, onComplete) {
   const clipPrefix = `pieceup-clip-${clipIdCounter++}`;
 
   container.innerHTML = "";
+
+  const card = document.createElement("div");
+  card.className = "pieceup-card";
+  container.appendChild(card);
+
+  const header = document.createElement("div");
+  header.className = "pieceup-header";
+  card.appendChild(header);
+
+  const progressGroup = document.createElement("div");
+  progressGroup.className = "pieceup-progress-group";
+  header.appendChild(progressGroup);
+
+  // One pip per piece while the count is small enough to read at a glance;
+  // beyond that they'd be too thin to see, so a single bar replaces them.
+  const usePips = pieces.length <= 20;
+  const progressTrack = document.createElement("div");
+  progressTrack.className = usePips
+    ? "pieceup-progress-pips"
+    : "pieceup-progress-bar";
+  progressGroup.appendChild(progressTrack);
+
+  const pips = [];
+  if (usePips) {
+    for (let i = 0; i < pieces.length; i++) {
+      const pip = document.createElement("span");
+      pip.className = "pieceup-pip";
+      progressTrack.appendChild(pip);
+      pips.push(pip);
+    }
+  } else {
+    const fill = document.createElement("span");
+    fill.className = "pieceup-progress-fill";
+    progressTrack.appendChild(fill);
+    pips.push(fill);
+  }
+
+  const progressLabel = document.createElement("span");
+  progressLabel.className = "pieceup-progress-label";
+  progressGroup.appendChild(progressLabel);
+
+  const controls = document.createElement("div");
+  controls.className = "pieceup-controls";
+  header.appendChild(controls);
+
+  const movesBadge = document.createElement("span");
+  movesBadge.className = "pieceup-badge";
+  controls.appendChild(movesBadge);
+
+  const shuffleButton = document.createElement("button");
+  shuffleButton.type = "button";
+  shuffleButton.className = "pieceup-shuffle";
+  controls.appendChild(shuffleButton);
+
   const stage = document.createElement("div");
   stage.className = "pieceup-stage";
-  container.appendChild(stage);
+  card.appendChild(stage);
 
   const boardEl = document.createElement("div");
   boardEl.className = "pieceup-board";
@@ -75,6 +137,11 @@ export function renderBoard(container, config, onComplete) {
     grabOffset: { x: 0, y: 0 },
     startPoint: { x: 0, y: 0 },
     moved: false,
+    moves: 0,
+    // Each shuffle re-derives the scatter from a new seed, so the pile looks
+    // genuinely different rather than merely re-sorted.
+    shuffleRound: 0,
+    shufflesLeft: config.shuffleLimit ?? 2,
   };
 
   const elements = new Map();
@@ -107,11 +174,27 @@ export function renderBoard(container, config, onComplete) {
     };
   }
 
-  function trayPlan(metrics) {
-    const target = Math.min(
-      TRAY_HEIGHT_MAX,
-      metrics.boardHeight * TRAY_HEIGHT_RATIO,
+  /**
+   * Whether the tray sits beside the board rather than under it.
+   *
+   * Read from a media query mirroring the stylesheet's breakpoint, not from
+   * measurements: the tray's height depends on this decision and the decision
+   * would depend on that height, so measuring it oscillates between states.
+   */
+  function isSideBySide() {
+    return (
+      typeof window !== "undefined" &&
+      typeof window.matchMedia === "function" &&
+      window.matchMedia(`(min-width: ${SIDE_BY_SIDE_MIN_WIDTH}px)`).matches
     );
+  }
+
+  function trayPlan(metrics) {
+    // Beside the board the tray gets the board's full height; beneath it, only
+    // a slice, so the board stays the focus.
+    const target = isSideBySide()
+      ? metrics.boardHeight
+      : Math.min(TRAY_HEIGHT_MAX, metrics.boardHeight * TRAY_HEIGHT_RATIO);
     return planTray(
       metrics.trayWidth,
       target,
@@ -185,7 +268,9 @@ export function renderBoard(container, config, onComplete) {
 
     const plan = trayPlan(metrics);
     state.plan = plan;
-    trayEl.style.height = `${plan.height}px`;
+    trayEl.style.height = isSideBySide()
+      ? `${metrics.boardHeight}px`
+      : `${plan.height}px`;
 
     slotsSvg.setAttribute(
       "viewBox",
@@ -253,10 +338,62 @@ export function renderBoard(container, config, onComplete) {
     el.slot.classList.toggle("is-filled", placed);
   }
 
+  function refreshHeader() {
+    const placed = board.locked.size;
+    progressLabel.textContent = `${placed} / ${pieces.length} pieces`;
+    movesBadge.textContent = `Moves: ${state.moves}`;
+
+    if (usePips) {
+      pips.forEach((pip, i) => pip.classList.toggle("is-on", i < placed));
+    } else {
+      pips[0].style.width = `${(placed / pieces.length) * 100}%`;
+    }
+
+    const exhausted = state.shufflesLeft <= 0;
+    shuffleButton.textContent = exhausted
+      ? "No shuffles left"
+      : `Shuffle (${state.shufflesLeft})`;
+    // Also disabled once solved: shuffling then has nothing left to move.
+    shuffleButton.disabled = exhausted || board.isComplete();
+  }
+
+  function shuffle() {
+    if (state.shufflesLeft <= 0) return;
+    state.shufflesLeft -= 1;
+    state.shuffleRound += 1;
+
+    // Only unplaced pieces move; already-solved work is never undone.
+    const loose = pieces.filter((piece) => !board.locked.has(piece.index));
+    const rnd = randomGenerator(`${seed}:shuffle:${state.shuffleRound}`);
+    const slots = loose.map((piece) => piece.trayOrder);
+    for (let i = slots.length - 1; i > 0; i--) {
+      const j = Math.floor(rnd() * (i + 1));
+      [slots[i], slots[j]] = [slots[j], slots[i]];
+    }
+    loose.forEach((piece, i) => {
+      piece.trayOrder = slots[i];
+      piece.tilt = (rnd() - 0.5) * 14;
+      // Pieces dropped loose on the board go back to the tray, which is what
+      // makes shuffling useful when the board is cluttered.
+      state.freePositions.delete(piece.index);
+    });
+
+    state.selected = null;
+    refresh();
+  }
+
+  shuffleButton.addEventListener("click", shuffle);
+
+  // Drawn immediately rather than waiting for refresh(): the header shows
+  // counts, not positions, so it must not sit blank until the board has been
+  // measured or the shopper has touched something.
+  refreshHeader();
+
   function refresh() {
     if (!state.metrics || !state.plan) return;
     for (const piece of pieces) applyPosition(piece, state.metrics, state.plan);
     refreshSlotButtons();
+    refreshHeader();
   }
 
   function place(piece) {
@@ -409,6 +546,7 @@ export function renderBoard(container, config, onComplete) {
         refresh();
         return;
       }
+      state.moves += 1;
       const position = state.freePositions.get(piece.index);
       if (position && !tryDrop(piece, position)) {
         // Wrong spot — send it back to the tray rather than leaving it loose,
@@ -445,6 +583,7 @@ export function renderBoard(container, config, onComplete) {
         if (!metrics || state.selected === null) return;
         const selected = pieces.find((p) => p.index === state.selected);
         if (!selected) return;
+        state.moves += 1;
         if (selected.row === piece.row && selected.col === piece.col) {
           board.locked.add(selected.index);
           place(selected);
@@ -502,9 +641,21 @@ export function renderBoard(container, config, onComplete) {
     observer.observe(boardEl);
   }
 
+  // The breakpoint flip changes the tray's target height, and a resize
+  // observer on the stage won't necessarily fire for it.
+  const breakpoint =
+    typeof window !== "undefined" && typeof window.matchMedia === "function"
+      ? window.matchMedia(`(min-width: ${SIDE_BY_SIDE_MIN_WIDTH}px)`)
+      : null;
+  const onBreakpointChange = () => layout();
+  if (breakpoint) breakpoint.addEventListener("change", onBreakpointChange);
+
   return {
     destroy() {
       if (observer) observer.disconnect();
+      if (breakpoint) {
+        breakpoint.removeEventListener("change", onBreakpointChange);
+      }
     },
   };
 }

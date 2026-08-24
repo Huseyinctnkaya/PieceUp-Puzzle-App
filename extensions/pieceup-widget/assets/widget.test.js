@@ -325,4 +325,99 @@ describe("initPieceUp", () => {
     root.querySelectorAll(".pieceup-slot-button")[2].click();
     expect(piece.classList.contains("is-placed")).toBe(false);
   });
+
+  it("shows progress and move count in the header", async () => {
+    const root = await openPuzzle(document.getElementById("pieceup-root"));
+
+    expect(root.querySelector(".pieceup-progress-label").textContent).toBe(
+      "0 / 4 pieces",
+    );
+    expect(root.querySelector(".pieceup-badge").textContent).toBe("Moves: 0");
+    // One pip per piece while the count is small.
+    expect(root.querySelectorAll(".pieceup-pip")).toHaveLength(4);
+  });
+
+  it("counts a move and lights a pip when a piece is placed", async () => {
+    const root = await openPuzzle(document.getElementById("pieceup-root"));
+
+    const piece = grabbable(root.querySelectorAll(".pieceup-piece")[1]);
+    piece.dispatchEvent(
+      new window.PointerEvent("pointerdown", {
+        clientX: 100,
+        clientY: 100,
+        pointerId: 1,
+      }),
+    );
+    piece.dispatchEvent(
+      new window.PointerEvent("pointerup", {
+        clientX: 100,
+        clientY: 100,
+        pointerId: 1,
+      }),
+    );
+    root.querySelectorAll(".pieceup-slot-button")[1].click();
+
+    expect(root.querySelector(".pieceup-progress-label").textContent).toBe(
+      "1 / 4 pieces",
+    );
+    expect(root.querySelector(".pieceup-badge").textContent).toBe("Moves: 1");
+    expect(root.querySelectorAll(".pieceup-pip.is-on")).toHaveLength(1);
+  });
+
+  it("re-scatters loose pieces on shuffle and spends an attempt", async () => {
+    const root = await openPuzzle(document.getElementById("pieceup-root"));
+
+    const before = Array.from(root.querySelectorAll(".pieceup-piece")).map(
+      (el) => el.style.left,
+    );
+    const shuffle = root.querySelector(".pieceup-shuffle");
+    expect(shuffle.textContent).toBe("Shuffle (2)");
+
+    shuffle.click();
+
+    expect(shuffle.textContent).toBe("Shuffle (1)");
+    const after = Array.from(root.querySelectorAll(".pieceup-piece")).map(
+      (el) => el.style.left,
+    );
+    expect(after).not.toEqual(before);
+  });
+
+  it("never undoes placed pieces when shuffling", async () => {
+    const root = await openPuzzle(document.getElementById("pieceup-root"));
+
+    const piece = grabbable(root.querySelectorAll(".pieceup-piece")[1]);
+    piece.dispatchEvent(
+      new window.PointerEvent("pointerdown", {
+        clientX: 100,
+        clientY: 100,
+        pointerId: 1,
+      }),
+    );
+    piece.dispatchEvent(
+      new window.PointerEvent("pointerup", {
+        clientX: 100,
+        clientY: 100,
+        pointerId: 1,
+      }),
+    );
+    root.querySelectorAll(".pieceup-slot-button")[1].click();
+    const placedLeft = piece.style.left;
+
+    root.querySelector(".pieceup-shuffle").click();
+
+    // Solved work has to survive a shuffle, or the button would be a trap.
+    expect(piece.classList.contains("is-placed")).toBe(true);
+    expect(piece.style.left).toBe(placedLeft);
+  });
+
+  it("disables shuffle once the attempts run out", async () => {
+    const root = await openPuzzle(document.getElementById("pieceup-root"));
+    const shuffle = root.querySelector(".pieceup-shuffle");
+
+    shuffle.click();
+    shuffle.click();
+
+    expect(shuffle.disabled).toBe(true);
+    expect(shuffle.textContent).toBe("No shuffles left");
+  });
 });

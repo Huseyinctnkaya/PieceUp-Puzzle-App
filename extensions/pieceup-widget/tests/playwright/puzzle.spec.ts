@@ -31,9 +31,9 @@ test("completes a 2x2 puzzle via pointer drag and shows the reward code", async 
     route.fulfill({ json: { discountCode: "PIECEUP-TEST99" } }),
   );
 
-  // Tall enough that the board and tray both fit without the popup scrolling —
-  // a scrolled-out tray would put pieces beyond the reach of mouse events.
-  await page.setViewportSize({ width: 1280, height: 1200 });
+  // Wide enough for the side-by-side layout, which is the arrangement most
+  // shoppers see; the stacked one is covered by the unit tests.
+  await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(fixtureUrl);
   // The fixture hangs initPieceUp off window so the test can start the widget
   // on demand; declaring the property is what keeps this off `any`.
