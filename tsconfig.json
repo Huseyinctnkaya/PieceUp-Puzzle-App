@@ -1,17 +1,16 @@
 {
   "include": ["env.d.ts", "**/*.ts", "**/*.tsx", ".react-router/types/**/*"],
-  // The reference puzzle under extensions/pieceup-widget/src is Preact and is
-  // compiled by its own esbuild step, which aliases the two @ikas modules it
-  // imports. Type-checking it here would resolve neither those aliases nor its
+  // The reference puzzle under widget/src is Preact and is compiled by its own
+  // esbuild step, which aliases the two @ikas modules it imports. Type-checking it here would resolve neither those aliases nor its
   // JSX, since this project's tsx is React. Files it imports that the app also
   // imports — lib/puzzle.ts — are still checked, because exclude only trims the
   // root file set, never what an included file pulls in.
   "exclude": [
     "node_modules",
-    "extensions/pieceup-widget/src/components/**",
-    "extensions/pieceup-widget/src/sub-components/**",
-    "extensions/pieceup-widget/src/shims/**",
-    "extensions/pieceup-widget/src/entry.tsx"
+    "widget/src/components/**",
+    "widget/src/sub-components/**",
+    "widget/src/shims/**",
+    "widget/src/entry.tsx"
   ],
   "compilerOptions": {
     "lib": ["DOM", "DOM.Iterable", "ES2022"],

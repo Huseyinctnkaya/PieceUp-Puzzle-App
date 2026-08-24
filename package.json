@@ -19,7 +19,7 @@
     "vite": "vite",
     "typecheck": "react-router typegen && tsc --noEmit",
     "test": "vitest run",
-    "build:widget": "node extensions/pieceup-widget/build.mjs",
+    "build:widget": "node widget/build.mjs",
     "test:e2e": "playwright test"
   },
   "type": "module",

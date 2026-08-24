@@ -8,10 +8,10 @@ public/build
 # code we carry rather than code we write, so our rules do not apply to it —
 # holding it to them would mean rewriting it, which defeats the point of using
 # the reference implementation.
-extensions/pieceup-widget/src/components
-extensions/pieceup-widget/src/sub-components
-extensions/pieceup-widget/src/lib
-extensions/pieceup-widget/src/global-types.ts
+widget/src/components
+widget/src/sub-components
+widget/src/lib
+widget/src/global-types.ts
 
 # Build output of extensions/pieceup-widget/build.mjs.
 extensions/pieceup-widget/assets/pieceup-app.js

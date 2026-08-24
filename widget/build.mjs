@@ -2,9 +2,12 @@
  * Bundles the reference puzzle into assets the theme extension can serve.
  *
  * A theme app extension has no build step of its own — Shopify serves whatever
- * sits in assets/ — so the bundle is produced here and committed. The two ikas
- * modules the reference imports are aliased to local shims, which is what lets
- * its source be used unmodified.
+ * sits in assets/, and permits no directories there beyond assets, blocks,
+ * snippets and locales — so the sources and this script live outside it and
+ * the built bundle is committed into assets/.
+ *
+ * The two @ikas modules the reference imports are aliased to local shims, which
+ * is what lets its source be used unmodified.
  */
 import { build } from "esbuild";
 import { fileURLToPath } from "node:url";
@@ -19,7 +22,7 @@ await build({
     // this single entry produces the whole widget's CSS.
     resolve(here, "src/components/PuzzleKampanya/styles.css"),
   ],
-  outdir: resolve(here, "assets"),
+  outdir: resolve(here, "../extensions/pieceup-widget/assets"),
   entryNames: "pieceup-app",
   bundle: true,
   format: "esm",

@@ -8,7 +8,7 @@ import { authenticate } from "../shopify.server";
 import {
   parcalariUret,
   parcaPathUret,
-} from "../../extensions/pieceup-widget/src/lib/puzzle";
+} from "../../widget/src/lib/puzzle";
 
 /** Rows and columns from a piece count, matching the storefront's mount. */
 function gridFor(pieceCount: number) {
