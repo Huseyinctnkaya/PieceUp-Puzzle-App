@@ -40,8 +40,10 @@ type = "multi_line_text_field"
 # separate system from [webhooks] below: they watch shop resources (products,
 # orders) with custom queries. PieceUp only needs the two app-lifecycle
 # webhooks, so this declares the version with an empty subscription list.
+# "unstable" is the only value accepted here — events are still in beta, so
+# this deliberately doesn't track the dated version used for webhooks below.
 [events]
-api_version = "2026-10"
+api_version = "unstable"
 subscription = []
 
 [webhooks]
