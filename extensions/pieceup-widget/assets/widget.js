@@ -5,7 +5,7 @@ import {
   submitCompletion,
   trackOpen,
 } from "./api.js";
-import { PuzzleBoard, buildPieces } from "./puzzle.js";
+import { renderBoard } from "./board.js";
 
 export async function initPieceUp(root) {
   const config = await fetchConfig();
@@ -115,102 +115,5 @@ function renderMessage(container, text) {
 }
 
 function renderPuzzle(container, config, onComplete) {
-  const rows = Math.ceil(Math.sqrt(config.pieceCount));
-  const cols = Math.ceil(config.pieceCount / rows);
-  const cellWidth = 100;
-  const cellHeight = 100;
-  const boardWidth = cols * cellWidth;
-  const boardHeight = rows * cellHeight;
-  const board = new PuzzleBoard({ rows, cols, cellWidth, cellHeight });
-  const pieces = buildPieces(
-    rows,
-    cols,
-    cellWidth,
-    cellHeight,
-    config.imageUrl,
-  );
-
-  container.innerHTML = "";
-  const boardEl = document.createElement("div");
-  boardEl.className = "pieceup-board";
-  boardEl.style.width = `${boardWidth}px`;
-  boardEl.style.height = `${boardHeight}px`;
-  boardEl.style.backgroundImage = `url(${config.imageUrl})`;
-  boardEl.style.backgroundSize = `${boardWidth}px ${boardHeight}px`;
-  container.appendChild(boardEl);
-
-  const trayEl = document.createElement("div");
-  trayEl.className = "pieceup-tray";
-  container.appendChild(trayEl);
-
-  for (const piece of pieces) {
-    const pieceEl = document.createElement("div");
-    pieceEl.className = "pieceup-piece";
-    pieceEl.style.clipPath = `path('${piece.path}')`;
-    pieceEl.style.backgroundImage = `url(${config.imageUrl})`;
-    // Each piece shows the image at full size, shifted so its own cell shows
-    // through the piece's clip-path shape (otherwise every piece would show
-    // the same top-left crop of the image).
-    pieceEl.style.backgroundSize = `${boardWidth}px ${boardHeight}px`;
-    pieceEl.style.backgroundPosition = `-${piece.col * cellWidth}px -${piece.row * cellHeight}px`;
-    trayEl.appendChild(pieceEl);
-
-    wireDrag(pieceEl, () => {
-      const boardRect = boardEl.getBoundingClientRect();
-      const pieceRect = pieceEl.getBoundingClientRect();
-      const dropX = pieceRect.left - boardRect.left + pieceRect.width / 2;
-      const dropY = pieceRect.top - boardRect.top + pieceRect.height / 2;
-      const { correct, complete } = board.attemptDrop(
-        piece.index,
-        dropX,
-        dropY,
-      );
-      if (correct) {
-        // Snap to the exact target cell position rather than wherever the
-        // pointer happened to release within the tolerance zone.
-        pieceEl.style.position = "fixed";
-        pieceEl.style.left = `${boardRect.left + piece.col * cellWidth}px`;
-        pieceEl.style.top = `${boardRect.top + piece.row * cellHeight}px`;
-        pieceEl.classList.add("pieceup-piece--locked");
-        if (complete) onComplete();
-      } else {
-        pieceEl.style.position = "";
-        pieceEl.style.left = "";
-        pieceEl.style.top = "";
-      }
-    });
-  }
-}
-
-function wireDrag(pieceEl, onDrop) {
-  let dragging = false;
-  let startX = 0;
-  let startY = 0;
-  let originX = 0;
-  let originY = 0;
-
-  pieceEl.addEventListener("pointerdown", (e) => {
-    dragging = true;
-    startX = e.clientX;
-    startY = e.clientY;
-    const rect = pieceEl.getBoundingClientRect();
-    originX = rect.left;
-    originY = rect.top;
-    pieceEl.setPointerCapture(e.pointerId);
-  });
-
-  pieceEl.addEventListener("pointermove", (e) => {
-    if (!dragging) return;
-    const dx = e.clientX - startX;
-    const dy = e.clientY - startY;
-    pieceEl.style.position = "fixed";
-    pieceEl.style.left = `${originX + dx}px`;
-    pieceEl.style.top = `${originY + dy}px`;
-  });
-
-  pieceEl.addEventListener("pointerup", () => {
-    if (!dragging) return;
-    dragging = false;
-    onDrop();
-  });
+  renderBoard(container, config, onComplete);
 }

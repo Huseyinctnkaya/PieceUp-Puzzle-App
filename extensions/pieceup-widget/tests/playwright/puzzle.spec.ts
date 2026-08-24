@@ -31,6 +31,9 @@ test("completes a 2x2 puzzle via pointer drag and shows the reward code", async 
     route.fulfill({ json: { discountCode: "PIECEUP-TEST99" } }),
   );
 
+  // Tall enough that the board and tray both fit without the popup scrolling —
+  // a scrolled-out tray would put pieces beyond the reach of mouse events.
+  await page.setViewportSize({ width: 1280, height: 1200 });
   await page.goto(fixtureUrl);
   // The fixture hangs initPieceUp off window so the test can start the widget
   // on demand; declaring the property is what keeps this off `any`.
@@ -43,34 +46,56 @@ test("completes a 2x2 puzzle via pointer drag and shows the reward code", async 
 
   await page.click(".pieceup-trigger");
 
-  const pieces = page.locator(".pieceup-piece");
   const board = page.locator(".pieceup-board");
+  await expect(board).toBeVisible();
+
+  const pieces = page.locator(".pieceup-piece");
   const count = await pieces.count();
+  expect(count).toBe(4);
+
+  const boardBox = await board.boundingBox();
+  if (!boardBox) throw new Error("missing board bounding box");
+  // 4 pieces → a 2x2 grid over the board.
+  const cellWidth = boardBox.width / 2;
+  const cellHeight = boardBox.height / 2;
 
   for (let i = 0; i < count; i++) {
     const piece = pieces.nth(i);
     const pieceBox = await piece.boundingBox();
     if (!pieceBox) throw new Error("missing piece bounding box");
 
-    await page.mouse.move(pieceBox.x + 50, pieceBox.y + 50);
+    // Grab at the piece's centre, wherever it happens to be scattered.
+    const grabX = pieceBox.x + pieceBox.width / 2;
+    const grabY = pieceBox.y + pieceBox.height / 2;
+    await page.mouse.move(grabX, grabY);
     await page.mouse.down();
 
-    // wireDrag() in widget.js switches the piece to `position: fixed` on the
-    // very first pointermove, pulling it out of the tray's flex flow. That
-    // shrinks the tray and (since the overlay vertically centers the popup)
-    // reflows the whole popup, moving the board on screen. A nudge move
-    // settles that reflow before we measure the board, so the target
-    // coordinates we drag to reflect where the board actually ends up
-    // rather than its pre-drag position.
-    await page.mouse.move(pieceBox.x + 51, pieceBox.y + 51);
+    // The first move lifts the piece out of the tray, where it grows from tray
+    // scale to full size under the pointer. Its position only tracks the
+    // pointer one-for-one after that, so the drag is aimed using the delta
+    // measured from here rather than from the pre-lift position.
+    await page.mouse.move(grabX + 4, grabY + 4);
 
-    const boardBox = await board.boundingBox();
-    if (!boardBox) throw new Error("missing board bounding box");
-    const targetX = boardBox.x + (i % 2) * 100 + 50;
-    const targetY = boardBox.y + Math.floor(i / 2) * 100 + 50;
+    const lifted = await piece.boundingBox();
+    if (!lifted) throw new Error("missing lifted bounding box");
+    const liftedCentreX = lifted.x + lifted.width / 2;
+    const liftedCentreY = lifted.y + lifted.height / 2;
 
-    await page.mouse.move(targetX, targetY, { steps: 5 });
+    // DOM order is row-major, so piece i belongs to row floor(i/2), col i%2.
+    const targetCentreX = boardBox.x + ((i % 2) + 0.5) * cellWidth;
+    const targetCentreY = boardBox.y + (Math.floor(i / 2) + 0.5) * cellHeight;
+
+    await page.mouse.move(
+      grabX + 4 + (targetCentreX - liftedCentreX),
+      grabY + 4 + (targetCentreY - liftedCentreY),
+      { steps: 5 },
+    );
     await page.mouse.up();
+
+    // Each piece must actually land before the next is dragged — otherwise a
+    // silent placement failure would only surface as a confusing timeout on
+    // the final message assertion.
+    await expect(piece).toHaveClass(/is-placed/);
   }
 
   await expect(page.locator(".pieceup-message")).toContainText(

@@ -59,7 +59,7 @@ export function PuzzlePreview({
     );
   }
 
-  const { pieces, cell, boardWidth, boardHeight } = geometry.data;
+  const { pieces, cell, tab, boxSize, boardWidth, boardHeight } = geometry.data;
 
   return (
     <s-box
@@ -86,23 +86,33 @@ export function PuzzlePreview({
             style={{
               display: "flex",
               flexWrap: "wrap",
-              gap: 6,
-              width: cell * 2 + 6,
+              gap: 4,
+              width: boxSize * 2 + 8,
             }}
           >
-            {pieces.map((piece) => (
-              <div
-                key={piece.index}
-                style={{
-                  width: cell,
-                  height: cell,
-                  clipPath: `path('${piece.path}')`,
-                  backgroundImage: `url(${imageUrl})`,
-                  backgroundSize: `${boardWidth}px ${boardHeight}px`,
-                  backgroundPosition: `-${piece.col * cell}px -${piece.row * cell}px`,
-                }}
-              />
-            ))}
+            {[...pieces]
+              // Shown in tray order and tilted, matching how they'll be
+              // scattered on the storefront rather than sitting in solved order.
+              .sort((a, b) => a.trayOrder - b.trayOrder)
+              .map((piece) => (
+                <div
+                  key={piece.index}
+                  style={{
+                    width: boxSize,
+                    height: boxSize,
+                    transform: `rotate(${piece.tilt}deg)`,
+                    // The box is larger than the cell so knobs aren't clipped;
+                    // the negative margin stops that extra padding pushing the
+                    // pieces apart visually.
+                    margin: -tab / 2,
+                    clipPath: `path('${piece.path}')`,
+                    backgroundImage: `url(${imageUrl})`,
+                    backgroundSize: `${boardWidth}px ${boardHeight}px`,
+                    backgroundPosition: `${-(piece.col * cell - tab)}px ${-(piece.row * cell - tab)}px`,
+                    filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.25))",
+                  }}
+                />
+              ))}
           </div>
         </s-stack>
         <s-text color="subdued">

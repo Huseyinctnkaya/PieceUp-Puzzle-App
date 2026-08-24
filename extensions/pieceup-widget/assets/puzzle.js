@@ -1,13 +1,19 @@
-import { getPieceEdges, buildPiecePath } from "./jigsaw.js";
+import { snapTolerance } from "./jigsaw.js";
 
-const SNAP_TOLERANCE_RATIO = 0.3;
-
+/**
+ * Tracks which pieces are placed and decides whether a drop counts.
+ *
+ * Deliberately holds no DOM and no pixel layout of its own: it's handed a
+ * position and answers yes/no, which is what makes the placement rules
+ * testable without a browser.
+ */
 export class PuzzleBoard {
-  constructor({ rows, cols, cellWidth, cellHeight }) {
+  constructor({ rows, cols, cellWidth, cellHeight, difficulty }) {
     this.rows = rows;
     this.cols = cols;
     this.cellWidth = cellWidth;
     this.cellHeight = cellHeight;
+    this.difficulty = difficulty;
     this.locked = new Set();
   }
 
@@ -19,38 +25,39 @@ export class PuzzleBoard {
     return this.locked.size === this.totalPieces();
   }
 
-  attemptDrop(pieceIndex, dropX, dropY) {
+  /** Where a piece's box belongs on the board, in board coordinates. */
+  targetPosition(pieceIndex, tab) {
+    const row = Math.floor(pieceIndex / this.cols);
+    const col = pieceIndex % this.cols;
+    return {
+      x: col * this.cellWidth - tab,
+      y: row * this.cellHeight - tab,
+    };
+  }
+
+  /**
+   * Tries to place a piece whose box top-left is at (x, y).
+   *
+   * Measured corner-to-corner against the target rather than centre-to-centre,
+   * so the tolerance means the same thing regardless of how far a knob happens
+   * to stick out on that particular piece.
+   */
+  attemptDrop(pieceIndex, x, y, tab = 0) {
     if (this.locked.has(pieceIndex)) {
       return { correct: false, complete: this.isComplete() };
     }
 
-    const row = Math.floor(pieceIndex / this.cols);
-    const col = pieceIndex % this.cols;
-    const targetX = col * this.cellWidth + this.cellWidth / 2;
-    const targetY = row * this.cellHeight + this.cellHeight / 2;
+    const target = this.targetPosition(pieceIndex, tab);
+    const distance = Math.hypot(x - target.x, y - target.y);
+    const threshold =
+      Math.min(this.cellWidth, this.cellHeight) *
+      snapTolerance(this.difficulty);
 
-    const toleranceX = this.cellWidth * SNAP_TOLERANCE_RATIO;
-    const toleranceY = this.cellHeight * SNAP_TOLERANCE_RATIO;
-
-    const correct =
-      Math.abs(dropX - targetX) <= toleranceX && Math.abs(dropY - targetY) <= toleranceY;
-
+    const correct = distance <= threshold;
     if (correct) {
       this.locked.add(pieceIndex);
     }
 
     return { correct, complete: this.isComplete() };
   }
-}
-
-export function buildPieces(rows, cols, cellWidth, cellHeight, seed) {
-  const pieces = [];
-  for (let row = 0; row < rows; row++) {
-    for (let col = 0; col < cols; col++) {
-      const edges = getPieceEdges(seed, row, col, rows, cols);
-      const path = buildPiecePath(cellWidth, cellHeight, edges);
-      pieces.push({ index: row * cols + col, row, col, path });
-    }
-  }
-  return pieces;
 }

@@ -6,8 +6,60 @@ vi.mock("./api.js");
 
 let initPieceUp;
 
+const BOARD_SIZE = 200;
+const TRAY_HEIGHT = 120;
+
+/**
+ * jsdom has no layout engine: every getBoundingClientRect returns zeroes, so
+ * the board's measure() would bail out and nothing would ever be positioned.
+ * Patching the prototype means the very first layout pass already sees real
+ * numbers, the way it would in a browser — a 200x200 board at (1000, 500)
+ * with a tray directly beneath it.
+ */
+function installLayoutStub() {
+  const rect = (left, top, width, height) => ({
+    left,
+    top,
+    width,
+    height,
+    right: left + width,
+    bottom: top + height,
+    x: left,
+    y: top,
+    toJSON: () => {},
+  });
+
+  Element.prototype.getBoundingClientRect = function () {
+    if (this.classList.contains("pieceup-stage")) {
+      return rect(1000, 500, BOARD_SIZE, BOARD_SIZE + TRAY_HEIGHT);
+    }
+    if (this.classList.contains("pieceup-board")) {
+      return rect(1000, 500, BOARD_SIZE, BOARD_SIZE);
+    }
+    if (this.classList.contains("pieceup-tray")) {
+      return rect(1000, 500 + BOARD_SIZE, BOARD_SIZE, TRAY_HEIGHT);
+    }
+    return rect(0, 0, 0, 0);
+  };
+}
+
+/** Opens the puzzle with layout measurements already in place. */
+async function openPuzzle(root) {
+  await initPieceUp(root);
+  root.querySelector(".pieceup-trigger").click();
+  return root;
+}
+
+/** Pieces can't capture pointers in jsdom; stub it so drags can be simulated. */
+function grabbable(piece) {
+  piece.setPointerCapture = () => {};
+  piece.releasePointerCapture = () => {};
+  return piece;
+}
+
 beforeEach(async () => {
   document.body.innerHTML = `<div id="pieceup-root" data-trigger-page="ALL"></div>`;
+  installLayoutStub();
   vi.mocked(api.fetchConfig).mockResolvedValue({
     imageUrl: "https://example.com/img.jpg",
     pieceCount: 4,
@@ -16,6 +68,8 @@ beforeEach(async () => {
     triggerDelaySeconds: null,
   });
   vi.mocked(api.fetchStatus).mockResolvedValue(false);
+  vi.mocked(api.trackOpen).mockImplementation(() => {});
+  vi.resetModules();
   ({ initPieceUp } = await import("./widget.js"));
 });
 
@@ -28,8 +82,7 @@ describe("initPieceUp", () => {
     expect(button).not.toBeNull();
 
     button.click();
-    const board = root.querySelector(".pieceup-board");
-    expect(board).not.toBeNull();
+    expect(root.querySelector(".pieceup-board")).not.toBeNull();
   });
 
   it("shows the already-played message instead of the board when already played", async () => {
@@ -42,50 +95,32 @@ describe("initPieceUp", () => {
     expect(root.querySelector(".pieceup-board")).toBeNull();
   });
 
-  it("positions each piece's background according to its own grid cell (Finding 1)", async () => {
-    const root = document.getElementById("pieceup-root");
-    await initPieceUp(root);
-    root.querySelector(".pieceup-trigger").click();
+  it("creates one piece per cell", async () => {
+    const root = await openPuzzle(document.getElementById("pieceup-root"));
+    expect(root.querySelectorAll(".pieceup-piece")).toHaveLength(4);
+  });
 
-    // pieceCount=4 -> rows=2, cols=2, so every piece should get a distinct
-    // background-position; if Finding 1's bug were present, every piece
-    // would share the same "0px 0px" position.
-    const pieces = root.querySelectorAll(".pieceup-piece");
-    expect(pieces.length).toBe(4);
-    const positions = Array.from(pieces).map((el) => el.style.backgroundPosition);
+  it("gives each piece its own slice of the image, not a shared crop", async () => {
+    const root = await openPuzzle(document.getElementById("pieceup-root"));
+
+    // pieceCount=4 → 2x2 over a 200px board → 100px cells. Every piece must
+    // offset the shared background to its own cell; the bug this guards
+    // against showed every piece the same top-left crop.
+    const faces = root.querySelectorAll(".pieceup-piece-face");
+    expect(faces).toHaveLength(4);
+
+    const positions = Array.from(faces).map(
+      (el) => el.style.backgroundPosition,
+    );
     expect(new Set(positions).size).toBe(4);
 
-    // DOM order matches buildPieces' row-major order, so the last piece is
-    // row 1, col 1 -> shifted by -100px/-100px.
-    expect(positions[3]).toBe("-100px -100px");
-    // The piece at row 0, col 1 is shifted horizontally only.
-    expect(positions[1]).toBe("-100px 0px");
+    // All four share one background sized to the whole board.
+    for (const face of faces) {
+      expect(face.style.backgroundSize).toBe(`${BOARD_SIZE}px ${BOARD_SIZE}px`);
+    }
   });
 
-  it("sizes the board and piece backgrounds from rows/cols instead of a hardcoded 300x300 (Finding 2)", async () => {
-    vi.mocked(api.fetchConfig).mockResolvedValue({
-      imageUrl: "https://example.com/img.jpg",
-      pieceCount: 6,
-      triggerMode: "BUTTON",
-      triggerPage: "ALL",
-      triggerDelaySeconds: null,
-    });
-    const root = document.getElementById("pieceup-root");
-    await initPieceUp(root);
-    root.querySelector(".pieceup-trigger").click();
-
-    // pieceCount=6 -> rows=ceil(sqrt(6))=3, cols=ceil(6/3)=2 -> a 200x300 board,
-    // not the 300x300 box that only fits a 3x3 (pieceCount=9) layout.
-    const board = root.querySelector(".pieceup-board");
-    expect(board.style.width).toBe("200px");
-    expect(board.style.height).toBe("300px");
-    expect(board.style.backgroundSize).toBe("200px 300px");
-
-    const piece = root.querySelector(".pieceup-piece");
-    expect(piece.style.backgroundSize).toBe("200px 300px");
-  });
-
-  it("closes the popup via the close button (Finding 3)", async () => {
+  it("closes the popup via the close button", async () => {
     const root = document.getElementById("pieceup-root");
     await initPieceUp(root);
     root.querySelector(".pieceup-trigger").click();
@@ -93,9 +128,7 @@ describe("initPieceUp", () => {
     const overlay = root.querySelector(".pieceup-overlay");
     expect(overlay.hidden).toBe(false);
 
-    const closeButton = root.querySelector(".pieceup-close");
-    expect(closeButton).not.toBeNull();
-    closeButton.click();
+    root.querySelector(".pieceup-close").click();
     expect(overlay.hidden).toBe(true);
   });
 
@@ -104,55 +137,192 @@ describe("initPieceUp", () => {
     await initPieceUp(root);
     const overlay = root.querySelector(".pieceup-overlay");
 
-    // Escape while closed: no-op, nothing to assert breaking.
-    document.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape" }));
+    document.dispatchEvent(
+      new window.KeyboardEvent("keydown", { key: "Escape" }),
+    );
     expect(overlay.hidden).toBe(true);
 
     root.querySelector(".pieceup-trigger").click();
     expect(overlay.hidden).toBe(false);
 
-    document.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape" }));
+    document.dispatchEvent(
+      new window.KeyboardEvent("keydown", { key: "Escape" }),
+    );
     expect(overlay.hidden).toBe(true);
   });
 
-  it("snaps a correctly-but-imprecisely dropped piece to its exact target cell, not the drop point (Finding 4)", async () => {
-    const root = document.getElementById("pieceup-root");
-    await initPieceUp(root);
-    root.querySelector(".pieceup-trigger").click();
+  it("snaps a near-miss drop to the exact cell rather than the drop point", async () => {
+    const root = await openPuzzle(document.getElementById("pieceup-root"));
 
-    const boardEl = root.querySelector(".pieceup-board");
-    boardEl.getBoundingClientRect = () => ({
-      left: 1000,
-      top: 500,
-      width: 200,
-      height: 200,
-      right: 1200,
-      bottom: 700,
-    });
+    // DOM order is row-major, so index 1 is row 0, col 1. Its box top-left
+    // sits a tab above and left of the cell: (100 - 20, 0 - 20).
+    const piece = grabbable(root.querySelectorAll(".pieceup-piece")[1]);
+    const tab = 100 * 0.2; // 100px cell, TAB_RATIO 0.2
+    const targetLeft = 100 - tab;
+    const targetTop = 0 - tab;
 
-    // pieceCount=4 -> rows=2, cols=2; DOM index 1 is row 0, col 1.
-    // Its exact target top-left (board-relative) is (100, 0), i.e. viewport
-    // (1100, 500). Drop it 10px off in each axis -- still within the 30%
-    // (30px) tolerance, so attemptDrop reports correct, but the raw drop
-    // point is NOT the exact cell position.
-    const pieceEl = root.querySelectorAll(".pieceup-piece")[1];
-    pieceEl.setPointerCapture = () => {};
-    pieceEl.getBoundingClientRect = () => ({
-      left: 1090,
-      top: 490,
-      width: 100,
-      height: 100,
-      right: 1190,
-      bottom: 590,
-    });
+    // Dragged the way a person would: grab the piece, move, then release
+    // slightly off target. The first move is what lifts it out of the tray —
+    // it grows to full size under the pointer, so the piece's position only
+    // tracks the pointer exactly from the second move onward. Measuring the
+    // delta after that first move keeps this independent of the tray scale.
+    piece.dispatchEvent(
+      new window.PointerEvent("pointerdown", {
+        clientX: 1100,
+        clientY: 700,
+        pointerId: 1,
+      }),
+    );
+    piece.dispatchEvent(
+      new window.PointerEvent("pointermove", {
+        clientX: 1140,
+        clientY: 700,
+        pointerId: 1,
+      }),
+    );
 
-    pieceEl.dispatchEvent(new window.PointerEvent("pointerdown", { clientX: 0, clientY: 0, pointerId: 1 }));
-    pieceEl.dispatchEvent(new window.PointerEvent("pointerup", { clientX: 0, clientY: 0, pointerId: 1 }));
+    const afterLift = {
+      x: parseFloat(piece.style.left),
+      y: parseFloat(piece.style.top),
+    };
+    // Aim 12px off in both axes: inside the tolerance, but not the exact spot.
+    const dx = targetLeft + 12 - afterLift.x;
+    const dy = targetTop + 12 - afterLift.y;
 
-    expect(pieceEl.classList.contains("pieceup-piece--locked")).toBe(true);
-    // Snapped to the exact grid cell (boardRect.left/top + col/row * cellWidth/Height),
-    // not left at the imprecise drop position (1090px / 490px).
-    expect(pieceEl.style.left).toBe("1100px");
-    expect(pieceEl.style.top).toBe("500px");
+    piece.dispatchEvent(
+      new window.PointerEvent("pointermove", {
+        clientX: 1140 + dx,
+        clientY: 700 + dy,
+        pointerId: 1,
+      }),
+    );
+    piece.dispatchEvent(
+      new window.PointerEvent("pointerup", {
+        clientX: 1140 + dx,
+        clientY: 700 + dy,
+        pointerId: 1,
+      }),
+    );
+
+    expect(piece.classList.contains("is-placed")).toBe(true);
+    // Snapped exactly, not left 12px off where the pointer released.
+    expect(piece.style.left).toBe(`${targetLeft}px`);
+    expect(piece.style.top).toBe(`${targetTop}px`);
+  });
+
+  it("returns a wrongly dropped piece to the tray instead of stranding it", async () => {
+    const root = await openPuzzle(document.getElementById("pieceup-root"));
+
+    const piece = grabbable(root.querySelectorAll(".pieceup-piece")[1]);
+    const before = piece.style.left;
+
+    piece.dispatchEvent(
+      new window.PointerEvent("pointerdown", {
+        clientX: 0,
+        clientY: 0,
+        pointerId: 1,
+      }),
+    );
+    piece.dispatchEvent(
+      new window.PointerEvent("pointermove", {
+        clientX: 9000,
+        clientY: 9000,
+        pointerId: 1,
+      }),
+    );
+    piece.dispatchEvent(
+      new window.PointerEvent("pointerup", {
+        clientX: 9000,
+        clientY: 9000,
+        pointerId: 1,
+      }),
+    );
+
+    expect(piece.classList.contains("is-placed")).toBe(false);
+    // Back where it started, rather than abandoned at (9000, 9000).
+    expect(piece.style.left).toBe(before);
+  });
+
+  it("treats a tap as selection rather than a drag", async () => {
+    const root = await openPuzzle(document.getElementById("pieceup-root"));
+
+    const piece = grabbable(root.querySelectorAll(".pieceup-piece")[0]);
+
+    // Press and release with only 2px of travel — below the drag threshold.
+    piece.dispatchEvent(
+      new window.PointerEvent("pointerdown", {
+        clientX: 100,
+        clientY: 100,
+        pointerId: 1,
+      }),
+    );
+    piece.dispatchEvent(
+      new window.PointerEvent("pointermove", {
+        clientX: 102,
+        clientY: 101,
+        pointerId: 1,
+      }),
+    );
+    piece.dispatchEvent(
+      new window.PointerEvent("pointerup", {
+        clientX: 102,
+        clientY: 101,
+        pointerId: 1,
+      }),
+    );
+
+    // Selected, not placed and not dragged away — this is what makes the
+    // tap-a-piece then tap-a-slot flow work on touch.
+    expect(piece.classList.contains("is-selected")).toBe(true);
+    expect(piece.classList.contains("is-placed")).toBe(false);
+  });
+
+  it("places a selected piece when its own slot is tapped", async () => {
+    const root = await openPuzzle(document.getElementById("pieceup-root"));
+
+    const piece = grabbable(root.querySelectorAll(".pieceup-piece")[1]);
+
+    piece.dispatchEvent(
+      new window.PointerEvent("pointerdown", {
+        clientX: 100,
+        clientY: 100,
+        pointerId: 1,
+      }),
+    );
+    piece.dispatchEvent(
+      new window.PointerEvent("pointerup", {
+        clientX: 100,
+        clientY: 100,
+        pointerId: 1,
+      }),
+    );
+
+    const slots = root.querySelectorAll(".pieceup-slot-button");
+    slots[1].click();
+    expect(piece.classList.contains("is-placed")).toBe(true);
+  });
+
+  it("does not place a selected piece on the wrong slot", async () => {
+    const root = await openPuzzle(document.getElementById("pieceup-root"));
+
+    const piece = grabbable(root.querySelectorAll(".pieceup-piece")[1]);
+
+    piece.dispatchEvent(
+      new window.PointerEvent("pointerdown", {
+        clientX: 100,
+        clientY: 100,
+        pointerId: 1,
+      }),
+    );
+    piece.dispatchEvent(
+      new window.PointerEvent("pointerup", {
+        clientX: 100,
+        clientY: 100,
+        pointerId: 1,
+      }),
+    );
+
+    root.querySelectorAll(".pieceup-slot-button")[2].click();
+    expect(piece.classList.contains("is-placed")).toBe(false);
   });
 });
