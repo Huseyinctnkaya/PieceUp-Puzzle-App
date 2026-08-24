@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 
 // Served by the static file server configured as `webServer` in
 // playwright.config.ts (baseURL points at it), so relative fetch() calls
@@ -7,6 +7,26 @@ import { test, expect } from "@playwright/test";
 // server's root is extensions/pieceup-widget/ (see static-server.mjs), so
 // this path is relative to there, not the repo root.
 const fixtureUrl = "/tests/playwright/fixture.html";
+
+/**
+ * Waits until the pieces stop moving.
+ *
+ * Pieces animate into place over 220ms, and getBoundingClientRect reports the
+ * interpolated geometry mid-flight — so measuring or clicking too early reads
+ * a position no piece ever actually occupies.
+ */
+async function waitForPiecesSettled(page: Page) {
+  await page.waitForFunction(() => {
+    const piece = document.querySelector(".pieceup-piece");
+    if (!piece) return false;
+    const width = Math.round(piece.getBoundingClientRect().width);
+    const store = window as unknown as { __w?: number; __stable?: number };
+    store.__stable = store.__w === width ? (store.__stable ?? 0) + 1 : 0;
+    store.__w = width;
+    return (store.__stable ?? 0) >= 3;
+  });
+}
+
 
 test("completes a 2x2 puzzle via pointer drag and shows the reward code", async ({
   page,
@@ -49,9 +69,16 @@ test("completes a 2x2 puzzle via pointer drag and shows the reward code", async 
   const board = page.locator(".pieceup-board");
   await expect(board).toBeVisible();
 
+  // The puzzle opens on a preview behind glass; the pieces only appear once
+  // the shopper opts in.
+  await expect(page.locator(".pieceup-piece").first()).toBeHidden();
+  await page.click(".pieceup-start");
+  await expect(page.locator(".pieceup-gate")).toBeHidden();
+
   const pieces = page.locator(".pieceup-piece");
   const count = await pieces.count();
   expect(count).toBe(4);
+  await waitForPiecesSettled(page);
 
   const boardBox = await board.boundingBox();
   if (!boardBox) throw new Error("missing board bounding box");
@@ -101,4 +128,189 @@ test("completes a 2x2 puzzle via pointer drag and shows the reward code", async 
   await expect(page.locator(".pieceup-message")).toContainText(
     "PIECEUP-TEST99",
   );
+});
+
+// A genuinely valid 200x100 PNG. A malformed one never fires image.onload,
+// which silently skips the board's aspect-ratio handling — so the ratio
+// assertion below would pass against a square board and prove nothing.
+const WIDE_IMAGE =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMgAAABkCAIAAABM5OhcAAAC6ElEQVR4nO3SeesYAgCA4d9oCBk5muWICdnE2sgIORpCRo72riFkW0O2jByNbMsRwtpk1pAts4ZYM2EhR6/lyBELy5FpsxyNbEL5Gv54n8/wDAzgINwOt8fBuAPuiDvhzrgL7oq74RDcHffAPXEv3Bv3waG4Lw7D/XB/PAAPxIPwYByOh+CheBgejkfgCByJR+JReDSOwtE4Bo/BY/E4HIvH4wl4Ip6EJ+MpeCqehqfjODwDz8Sz8Gw8B8/F83A8no8X4IV4EV6Ml+AEBCfiJLwUL8PL8Qq8Eq/Cq3EyTsGpOA2vwWvxOrwep+MMvAFn4o14E96Mt+CteBvOwtvxDrwTZ+McnIt34d14D96L9+H9+AA+iA/hwzgP5+MCfAQfxYX4GC7Cxfg4PoFP4lO4BJfi07gMn8HluAKfxefweXwBX8SVuApfwtX4Mr6Cr+JruAZfxzfwTXwL38Z38F0U38O1+D5+gB/iR/gxfoKf4mf4OX6B6/BL/Aq/xvX4DX6L3+H3+ANuwB9xI27Cn3Az/oy/4K/4G27B3/EP/BO34jb8C//Gf/BfHChWsYpVrGIVq1jFKlaxilWsYhWrWMUqVrGKVaxiFatYxSpWsYpVrGIVq1jFKlaxilWsYhWrWMUqVrGKVaxiFatYxSpWsYpVrGIVq1jFKlaxilWsYhWrWMUqVrGKVaxiFatYxSpWsYpVrGIVq1jFKlaxilWsYhWrWMUqVrGKVaxiFatYxSpWsYpVrGIVq1jFKlaxilWsYhWrWMUqVrGKVaxiFatYxSpWsYpVrGIVq1jFKlaxilWsYhWrWMUqVrGKVaxiFatYxSpWsYpVrGIVq1jFKlaxilWsYhWrWMUqVrGKVaxiFatYxSpWsYpVrGIVq1jFKlaxilWsYhWrWMUqVrGKVaxiFatYxSpWsYpVrGIVq1jFKlaxilWsYhWrWMUqVrGKVaxiFatYxSpWsYpVrGIVq1jFKlaxilWsYhXr/x3rP5chGL7lzUSdAAAAAElFTkSuQmCC";
+
+/**
+ * The pieces have to be reachable without scrolling. A narrow viewport puts the
+ * tray under the board, and it used to land past the bottom of the popup: the
+ * puzzle looked empty and the pieces couldn't be dragged at all.
+ */
+for (const [width, height] of [
+  [560, 800],
+  [900, 800],
+  [1440, 900],
+]) {
+  test(`fits the viewport at ${width}x${height}`, async ({ page }) => {
+    await page.route("**/apps/pieceup/config", (route) =>
+      route.fulfill({
+        json: {
+          config: {
+            imageUrl: WIDE_IMAGE,
+            pieceCount: 9,
+            triggerMode: "BUTTON",
+            triggerPage: "ALL",
+            triggerDelaySeconds: null,
+          },
+        },
+      }),
+    );
+    await page.route("**/apps/pieceup/status*", (route) =>
+      route.fulfill({ json: { alreadyPlayed: false } }),
+    );
+
+    await page.setViewportSize({ width, height });
+    await page.goto(fixtureUrl);
+    await page.evaluate(() => {
+      const w = window as unknown as {
+        __initPieceUp: (root: HTMLElement | null) => Promise<void>;
+      };
+      return w.__initPieceUp(document.getElementById("pieceup-root"));
+    });
+    await page.click(".pieceup-trigger");
+    await page.click(".pieceup-start");
+    await expect(page.locator(".pieceup-piece").first()).toBeVisible();
+    await waitForPiecesSettled(page);
+
+    const result = await page.evaluate((viewportHeight) => {
+      const pick = (selector: string) =>
+        document.querySelector(selector) as HTMLElement;
+      const tray = pick(".pieceup-tray").getBoundingClientRect();
+      const board = pick(".pieceup-board").getBoundingClientRect();
+      const popup = pick(".pieceup-popup");
+      const pieces = Array.from(
+        document.querySelectorAll(".pieceup-piece"),
+      ).map((piece) => piece.getBoundingClientRect());
+      const card = pick(".pieceup-card").getBoundingClientRect();
+
+      // Every piece must be grabbable where a player would aim: its centre. The
+      // tray overlaps pieces on purpose, and overlapping too far put some
+      // centres underneath a neighbour, so a pointerdown there dragged the
+      // wrong piece — or, for the topmost piece, nothing the player intended.
+      const unreachable = Array.from(
+        document.querySelectorAll(".pieceup-piece"),
+      ).filter((piece) => {
+        const rect = piece.getBoundingClientRect();
+        const hit = document.elementFromPoint(
+          rect.x + rect.width / 2,
+          rect.y + rect.height / 2,
+        );
+        return !piece.contains(hit);
+      }).length;
+
+      return {
+        unreachablePieces: unreachable,
+        trayVisible: tray.bottom <= viewportHeight && tray.top >= 0,
+        popupScrolls: popup.scrollHeight > popup.clientHeight + 1,
+        offscreenPieces: pieces.filter(
+          (rect) => rect.bottom > viewportHeight || rect.top < 0,
+        ).length,
+        // Sideways overflow clips pieces against the card edge, which reads as
+        // half-drawn pieces rather than as something scrolled out of view.
+        clippedPieces: pieces.filter(
+          (rect) => rect.right > card.right + 1 || rect.left < card.left - 1,
+        ).length,
+        trayOverflowsCard: tray.right > card.right + 1,
+        boardRatio: board.width / board.height,
+      };
+    }, height);
+
+    expect(result.unreachablePieces).toBe(0);
+    expect(result.trayVisible).toBe(true);
+    expect(result.popupScrolls).toBe(false);
+    expect(result.offscreenPieces).toBe(0);
+    expect(result.trayOverflowsCard).toBe(false);
+    expect(result.clippedPieces).toBe(0);
+    // The board must keep the image's proportions: capping its height used to
+    // clamp height while leaving width alone, which stretched the picture.
+    expect(result.boardRatio).toBeCloseTo(2, 1);
+  });
+}
+
+test("shows the merchant's copy above the card, as text not markup", async ({
+  page,
+}) => {
+  await page.route("**/apps/pieceup/config", (route) =>
+    route.fulfill({
+      json: {
+        config: {
+          badgeLabel: "Win a reward",
+          headline: "Solve the puzzle",
+          // Merchant-authored copy reaches every shopper's page, so it must
+          // never be parsed as markup.
+          description: "<img src=x onerror=alert(1)>Drag the pieces",
+          imageUrl: WIDE_IMAGE,
+          pieceCount: 4,
+          triggerMode: "BUTTON",
+          triggerPage: "ALL",
+          triggerDelaySeconds: null,
+        },
+      },
+    }),
+  );
+  await page.route("**/apps/pieceup/status*", (route) =>
+    route.fulfill({ json: { alreadyPlayed: false } }),
+  );
+
+  await page.goto(fixtureUrl);
+  await page.evaluate(() => {
+    const w = window as unknown as {
+      __initPieceUp: (root: HTMLElement | null) => Promise<void>;
+    };
+    return w.__initPieceUp(document.getElementById("pieceup-root"));
+  });
+  await page.click(".pieceup-trigger");
+
+  await expect(page.locator(".pieceup-intro-badge")).toContainText(
+    "Win a reward",
+  );
+  await expect(page.locator(".pieceup-intro-title")).toHaveText(
+    "Solve the puzzle",
+  );
+  await expect(page.locator(".pieceup-intro-text")).toHaveText(
+    "<img src=x onerror=alert(1)>Drag the pieces",
+  );
+  await expect(page.locator(".pieceup-intro-text img")).toHaveCount(0);
+});
+
+test("omits the intro entirely when the merchant wrote none", async ({
+  page,
+}) => {
+  await page.route("**/apps/pieceup/config", (route) =>
+    route.fulfill({
+      json: {
+        config: {
+          badgeLabel: null,
+          headline: null,
+          description: null,
+          imageUrl: WIDE_IMAGE,
+          pieceCount: 4,
+          triggerMode: "BUTTON",
+          triggerPage: "ALL",
+          triggerDelaySeconds: null,
+        },
+      },
+    }),
+  );
+  await page.route("**/apps/pieceup/status*", (route) =>
+    route.fulfill({ json: { alreadyPlayed: false } }),
+  );
+
+  await page.goto(fixtureUrl);
+  await page.evaluate(() => {
+    const w = window as unknown as {
+      __initPieceUp: (root: HTMLElement | null) => Promise<void>;
+    };
+    return w.__initPieceUp(document.getElementById("pieceup-root"));
+  });
+  await page.click(".pieceup-trigger");
+
+  await expect(page.locator(".pieceup-card")).toBeVisible();
+  // An empty heading block would push the puzzle down for no reason.
+  await expect(page.locator(".pieceup-intro")).toHaveCount(0);
 });

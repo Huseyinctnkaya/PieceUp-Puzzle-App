@@ -2,6 +2,11 @@ import db from "../db.server";
 
 export type PuzzleConfigInput = {
   name: string;
+  // Optional: the popup renders fine with none of them, and leaving a key out
+  // of an update means "don't touch it" rather than "clear it".
+  badgeLabel?: string | null;
+  headline?: string | null;
+  description?: string | null;
   imageUrl: string;
   pieceCount: number;
   rewardType: "PERCENTAGE_DISCOUNT" | "FREE_PRODUCT_DISCOUNT";

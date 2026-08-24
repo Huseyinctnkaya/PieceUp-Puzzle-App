@@ -1,3 +1,17 @@
+/* A theme app extension inherits whatever CSS the merchant's theme ships, so a
+   global `box-sizing: border-box` reset cannot be assumed. Under the default
+   content-box, `width: 100%` plus padding makes every one of our boxes wider
+   than its parent — which pushed the tray past the card edge and clipped the
+   pieces against it. Scoped to our own subtree: a global reset here would
+   change the merchant's storefront layout. */
+.pieceup-overlay,
+.pieceup-overlay *,
+.pieceup-overlay *::before,
+.pieceup-overlay *::after,
+.pieceup-trigger {
+  box-sizing: border-box;
+}
+
 .pieceup-overlay {
   position: fixed;
   inset: 0;
@@ -26,7 +40,8 @@
   position: relative;
   background: #fff;
   border-radius: 18px;
-  padding: 20px;
+  /* Extra top room so the card header clears the floating close button. */
+  padding: 52px 20px 20px;
   width: min(1080px, 96vw);
   max-height: 94vh;
   overflow: auto;
@@ -40,8 +55,92 @@
     sans-serif;
 }
 
+/* Taken out of flow so it sits in the popup's corner instead of pushing the
+   card down, and sized to the 44px touch target a thumb needs. */
+.pieceup-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.05);
+  color: rgba(0, 0, 0, 0.6);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    color 160ms ease;
+}
+
+.pieceup-close:hover {
+  background: rgba(0, 0, 0, 0.09);
+  color: #1a1a1a;
+}
+
+.pieceup-close:focus-visible {
+  outline: 2px solid #005bd3;
+  outline-offset: 2px;
+}
+
 .pieceup-content {
   width: 100%;
+}
+
+/* Merchant copy above the card. Centred and narrow: it is a campaign heading,
+   not body text, and long lines read badly over a wide popup. */
+.pieceup-intro {
+  max-width: 620px;
+  margin: 0 auto 22px;
+  text-align: center;
+}
+
+.pieceup-intro-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 31px;
+  padding: 0 14px 0 11px;
+  margin: 0 0 14px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.04);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #1a1a1a;
+  opacity: 0.85;
+}
+
+.pieceup-intro-icon {
+  width: 19px;
+  height: 19px;
+  opacity: 0.95;
+}
+
+.pieceup-intro-title {
+  margin: 0;
+  font-size: clamp(24px, 3.2vw, 38px);
+  line-height: 1.1;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  color: #1a1a1a;
+  text-wrap: balance;
+}
+
+.pieceup-intro-text {
+  margin: 10px auto 0;
+  max-width: 46ch;
+  font-size: 15px;
+  line-height: 1.55;
+  color: #1a1a1a;
+  opacity: 0.55;
 }
 
 .pieceup-card {
@@ -153,6 +252,10 @@
    drag from tray to board be one continuous movement rather than a handoff
    between two containers. */
 .pieceup-stage {
+  /* The height the board may occupy. Read by the board's max-width (set in
+     board.js from the image's ratio), so a height cap narrows the board
+     rather than distorting it. */
+  --pieceup-board-height: 44vh;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -175,19 +278,29 @@
     align-items: flex-start;
   }
 
+  .pieceup-stage {
+    --pieceup-board-height: 74vh;
+  }
+
   .pieceup-board {
     flex: 1 1 60%;
   }
 
   .pieceup-tray {
     flex: 1 1 40%;
-    margin-top: 0;
   }
 }
 
+/* Height is capped, not just width. Stacked under the tray, an uncapped board
+   pushed the pieces past the bottom of the popup — visible only by scrolling,
+   which is no use when the pieces are what you're meant to drag. Sizing from
+   height (with max-width as the other bound) keeps the image's proportions
+   instead of stretching it to fill. */
 .pieceup-board {
   position: relative;
   width: 100%;
+  max-width: 100%;
+  max-height: var(--pieceup-board-height);
   aspect-ratio: 1;
   background-color: #f1f1f1;
   background-size: cover;
@@ -240,6 +353,85 @@
   border: 1px solid rgba(0, 0, 0, 0.05);
   border-radius: 10px;
   background: #fafafa;
+}
+
+/* The start gate, over the board and tray. Frosted rather than opaque so the
+   finished picture stays visible underneath — the reward is the invitation. */
+.pieceup-gate {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 30;
+  border-radius: 10px;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.16),
+    rgba(255, 255, 255, 0.42)
+  );
+  backdrop-filter: blur(2.5px) saturate(1.4);
+  -webkit-backdrop-filter: blur(2.5px) saturate(1.4);
+}
+
+.pieceup-stage:not(.is-gated) .pieceup-gate {
+  display: none;
+}
+
+/* Hidden rather than absent: the pieces keep their laid-out positions, so
+   starting the game animates them from the tray instead of popping them in. */
+.pieceup-stage.is-gated .pieceup-piece,
+.pieceup-stage.is-gated .pieceup-slots {
+  visibility: hidden;
+}
+
+.pieceup-gate-box {
+  max-width: 340px;
+  text-align: center;
+}
+
+.pieceup-start {
+  height: 46px;
+  padding: 0 28px;
+  border: 0;
+  border-radius: 999px;
+  background-color: #1a1a1a;
+  background-image: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.22),
+    rgba(255, 255, 255, 0.04) 46%,
+    rgba(0, 0, 0, 0.1)
+  );
+  color: #fff;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.012em;
+  cursor: pointer;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.32),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.16),
+    0 1px 2px rgba(0, 0, 0, 0.16),
+    0 10px 22px -8px rgba(0, 0, 0, 0.42);
+  transition:
+    transform 160ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 200ms ease;
+}
+
+.pieceup-start:hover {
+  transform: translateY(-1px);
+}
+
+.pieceup-start:active {
+  transform: translateY(0);
+}
+
+.pieceup-gate-hint {
+  margin: 14px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  opacity: 0.6;
 }
 
 .pieceup-defs {
@@ -308,6 +500,16 @@
   background-repeat: no-repeat;
 }
 
+/* Fallback when the puzzle image can't be loaded: without a fill the pieces
+   are invisible and the tray reads as empty. */
+.pieceup-image-failed .pieceup-piece-face {
+  background-color: #b9bec4;
+}
+
+.pieceup-image-failed .pieceup-board {
+  background-color: #ececed;
+}
+
 .pieceup-piece-outline {
   position: absolute;
   inset: 0;
@@ -346,7 +548,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .pieceup-piece,
-  .pieceup-piece.just-placed {
+  .pieceup-piece.just-placed,
+  .pieceup-start {
     transition: none;
     animation: none;
   }

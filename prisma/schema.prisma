@@ -37,6 +37,11 @@ model PuzzleConfig {
   id                  String    @id @default(cuid())
   shopDomain          String
   name                String    @default("Puzzle")
+  // Storefront copy, shown above the puzzle card. Nullable because the popup
+  // reads fine without any of it — an empty headline simply renders nothing.
+  badgeLabel          String?
+  headline            String?
+  description         String?
   imageUrl            String?
   pieceCount          Int       @default(9)
   rewardType          String    @default("PERCENTAGE_DISCOUNT")

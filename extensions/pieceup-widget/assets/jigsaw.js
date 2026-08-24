@@ -203,10 +203,19 @@ export function gridFor(pieceCount) {
 /** Scales tried largest-first; the first one that fits the tray wins. */
 const SCALE_CANDIDATES = [0.78, 0.72, 0.66, 0.6, 0.54, 0.48, 0.42, 0.36, 0.3];
 
-/** Horizontal step between pieces, as a fraction of box width (they overlap). */
+// A piece's box is padded by a tab on each side, so its visible body is the
+// middle ~71% of the box and a knob reaches another ~14% beyond that. A piece
+// therefore covers ground up to 0.5 box from its own centre, and any step
+// smaller than that — once the scatter in board.js has eaten into it — leaves
+// a piece buried under its neighbour: visible, but impossible to grab, because
+// a pointerdown on its centre hits whatever is painted on top.
+//
+// So the steps below, minus twice the scatter offsets in board.js, must stay
+// above 0.5. They still overlap enough to read as a pile rather than a grid.
+/** Horizontal step between pieces, as a fraction of box width. */
 const STEP_X = 0.74;
 /** Vertical step between tray rows, as a fraction of box height. */
-const STEP_Y = 0.52;
+const STEP_Y = 0.62;
 /** Tray's top and bottom padding. */
 const TRAY_PADDING = 24;
 
@@ -218,8 +227,12 @@ function computePlan(scale, trayWidth, boxWidth, boxHeight, totalPieces) {
     Math.min(totalPieces, Math.floor(trayWidth / (bw * STEP_X))),
   );
   const rows = Math.ceil(totalPieces / columns);
-  const height = bh + (rows - 1) * bh * STEP_Y + TRAY_PADDING;
-  return { scale, columns, rows, height };
+  const stepY = bh * STEP_Y;
+  const height = bh + (rows - 1) * stepY + TRAY_PADDING;
+  // stepY travels with the plan rather than being re-derived by the caller:
+  // when the layout code kept its own copy of the constant, the two drifted
+  // apart and the tray was packed tighter than the height it was budgeted.
+  return { scale, columns, rows, height, stepY };
 }
 
 /**
@@ -238,7 +251,13 @@ export function planTray(
   totalPieces,
 ) {
   if (trayWidth <= 0 || boxWidth <= 0) {
-    return { scale: 0.6, columns: 1, rows: totalPieces, height: 0 };
+    return {
+      scale: 0.6,
+      columns: 1,
+      rows: totalPieces,
+      height: 0,
+      stepY: boxHeight * 0.6 * STEP_Y,
+    };
   }
   for (const scale of SCALE_CANDIDATES) {
     const plan = computePlan(

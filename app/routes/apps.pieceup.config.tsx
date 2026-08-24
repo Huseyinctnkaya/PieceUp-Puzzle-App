@@ -16,6 +16,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
   return new Response(
     JSON.stringify({
       config: {
+        badgeLabel: config.badgeLabel,
+        headline: config.headline,
+        description: config.description,
         imageUrl: config.imageUrl,
         pieceCount: config.pieceCount,
         triggerMode: config.triggerMode,

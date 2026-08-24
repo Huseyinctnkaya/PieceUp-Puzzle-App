@@ -13,11 +13,78 @@ const DRAG_THRESHOLD = 5;
 const TRAY_HEIGHT_RATIO = 0.62;
 const TRAY_HEIGHT_MAX = 240;
 /** Must match the stylesheet's breakpoint, or the two would disagree. */
+// How far a piece may wander from its tray slot, as a fraction of its size, so
+// the pile looks handmade rather than gridded. Bounded by the step sizes in
+// jigsaw.js: twice the scatter must not eat the step below 0.5 of a box, or
+// pieces start burying each other's centres and can no longer be picked up.
+const SCATTER_X = 0.1;
+const SCATTER_Y = 0.05;
+
 const SIDE_BY_SIDE_MIN_WIDTH = 860;
 /** Tab height as a fraction of the cell — how pronounced the knobs are. */
 const TAB_RATIO = 0.2;
 
 let clipIdCounter = 0;
+
+// A simplified jigsaw silhouette: knob on top, notch on the right. The real
+// piece generator draws proper bezier edges, but at badge size that outline
+// turns to mush, so this is the same idea drawn by hand.
+const BADGE_PATH =
+  "M6 4h4a2.4 2.4 0 1 1 4.8 0H19a1.2 1.2 0 0 1 1.2 1.2V10a2.4 2.4 0 1 0 0 4.8v4.8a1.2 1.2 0 0 1-1.2 1.2H5.2A1.2 1.2 0 0 1 4 19.6V5.2A1.2 1.2 0 0 1 5.2 4z";
+
+/**
+ * Builds the merchant's copy above the card: badge, headline, description.
+ *
+ * Every part is optional and each is skipped when unset, so a merchant who
+ * writes nothing gets the bare puzzle rather than an empty heading block.
+ */
+function buildIntro(container, config) {
+  const badgeLabel = (config.badgeLabel || "").trim();
+  const headline = (config.headline || "").trim();
+  const description = (config.description || "").trim();
+  if (!badgeLabel && !headline && !description) return;
+
+  const intro = document.createElement("header");
+  intro.className = "pieceup-intro";
+
+  if (badgeLabel) {
+    const badge = document.createElement("span");
+    badge.className = "pieceup-intro-badge";
+
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "pieceup-intro-icon");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("aria-hidden", "true");
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", BADGE_PATH);
+    path.setAttribute("fill", "none");
+    path.setAttribute("stroke", "currentColor");
+    path.setAttribute("stroke-width", "1.9");
+    path.setAttribute("stroke-linejoin", "round");
+    svg.appendChild(path);
+    badge.appendChild(svg);
+    // textContent, not innerHTML: this is merchant-authored copy arriving over
+    // the app proxy, and it lands on every shopper's page.
+    badge.appendChild(document.createTextNode(badgeLabel));
+    intro.appendChild(badge);
+  }
+
+  if (headline) {
+    const title = document.createElement("h2");
+    title.className = "pieceup-intro-title";
+    title.textContent = headline;
+    intro.appendChild(title);
+  }
+
+  if (description) {
+    const text = document.createElement("p");
+    text.className = "pieceup-intro-text";
+    text.textContent = description;
+    intro.appendChild(text);
+  }
+
+  container.appendChild(intro);
+}
 
 /**
  * Renders the puzzle and owns all of its interaction.
@@ -45,6 +112,8 @@ export function renderBoard(container, config, onComplete) {
   const clipPrefix = `pieceup-clip-${clipIdCounter++}`;
 
   container.innerHTML = "";
+
+  buildIntro(container, config);
 
   const card = document.createElement("div");
   card.className = "pieceup-card";
@@ -111,6 +180,28 @@ export function renderBoard(container, config, onComplete) {
   trayEl.className = "pieceup-tray";
   stage.appendChild(trayEl);
 
+  // The start gate. The reference opens on the finished picture behind glass
+  // with a single call to action, so the shopper sees the prize before the
+  // puzzle scatters into pieces.
+  const gate = document.createElement("div");
+  gate.className = "pieceup-gate";
+  const gateBox = document.createElement("div");
+  gateBox.className = "pieceup-gate-box";
+  gate.appendChild(gateBox);
+
+  const startButton = document.createElement("button");
+  startButton.type = "button";
+  startButton.className = "pieceup-start";
+  startButton.textContent = config.startLabel || "Start puzzle";
+  gateBox.appendChild(startButton);
+
+  const gateHint = document.createElement("p");
+  gateHint.className = "pieceup-gate-hint";
+  gateHint.textContent =
+    config.startHint || "Drag every piece onto the board to win your reward.";
+  gateBox.appendChild(gateHint);
+  stage.appendChild(gate);
+
   // clip-path definitions live in one hidden svg shared by every piece.
   const defsSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   defsSvg.setAttribute("class", "pieceup-defs");
@@ -142,6 +233,8 @@ export function renderBoard(container, config, onComplete) {
     // genuinely different rather than merely re-sorted.
     shuffleRound: 0,
     shufflesLeft: config.shuffleLimit ?? 2,
+    // The puzzle waits behind the gate until the shopper opts in.
+    gated: true,
   };
 
   const elements = new Map();
@@ -215,7 +308,7 @@ export function renderBoard(container, config, onComplete) {
       plan.columns > 1
         ? Math.max(0, metrics.trayWidth - scaledW) / (plan.columns - 1)
         : 0;
-    const stepY = scaledH * 0.52;
+    const stepY = plan.stepY;
     const topGap = Math.max(
       0,
       (metrics.trayHeight - (scaledH + (plan.rows - 1) * stepY)) / 2,
@@ -226,9 +319,9 @@ export function renderBoard(container, config, onComplete) {
       (plan.columns > 1
         ? col * stepX
         : Math.max(0, metrics.trayWidth - scaledW) / 2) +
-      piece.offsetX * scaledW * 0.3;
+      piece.offsetX * scaledW * SCATTER_X;
     const visualY =
-      metrics.trayY + topGap + row * stepY + piece.offsetY * scaledH * 0.14;
+      metrics.trayY + topGap + row * stepY + piece.offsetY * scaledH * SCATTER_Y;
 
     // Keep the scatter from pushing a piece out of the tray entirely.
     const clampedX = Math.min(
@@ -613,17 +706,45 @@ export function renderBoard(container, config, onComplete) {
     }
   }
 
-  boardEl.style.backgroundImage = config.showGuide
-    ? `url("${config.imageUrl}")`
-    : "";
+  // Gated, the board is a preview of the finished picture — that is the point
+  // of the start screen — so it ignores showGuide until the game begins.
+  function applyBoardImage() {
+    boardEl.style.backgroundImage =
+      state.gated || config.showGuide ? `url("${config.imageUrl}")` : "";
+  }
+  applyBoardImage();
+
+  stage.classList.add("is-gated");
+  startButton.addEventListener("click", () => {
+    state.gated = false;
+    stage.classList.remove("is-gated");
+    applyBoardImage();
+    // Pieces were laid out while hidden; re-running now lets them animate in
+    // from the tray rather than appearing already settled.
+    layout();
+    if (typeof config.onStart === "function") config.onStart();
+  });
 
   // The board's shape follows the image, so the puzzle isn't distorted.
   const image = new Image();
   image.onload = () => {
     if (image.naturalWidth && image.naturalHeight) {
+      const ratio = image.naturalWidth / image.naturalHeight;
       boardEl.style.aspectRatio = `${image.naturalWidth} / ${image.naturalHeight}`;
+      // Bounding the width by (height budget x ratio) is what makes the height
+      // cap shrink the board instead of squashing the picture: max-height alone
+      // clamps height while width stays put, which stretches the image.
+      boardEl.style.maxWidth = `calc(var(--pieceup-board-height) * ${ratio})`;
     }
     layout();
+  };
+  image.onerror = () => {
+    // Pieces are drawn purely as background-image, so a failed load renders
+    // them invisible and the puzzle looks empty. A flat fill keeps it playable
+    // and, more importantly, keeps the failure visible rather than silent.
+    // Only the fill changes, not the geometry — re-running layout() here would
+    // restart every piece's position transition for no visible gain.
+    stage.classList.add("pieceup-image-failed");
   };
   image.src = config.imageUrl;
 

@@ -34,6 +34,11 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   const input = {
     name: String(form.get("name") || "Puzzle"),
+    // Blank copy is stored as null, so the storefront can tell "not set" from
+    // "deliberately empty" without inspecting whitespace.
+    badgeLabel: String(form.get("badgeLabel") || "").trim() || null,
+    headline: String(form.get("headline") || "").trim() || null,
+    description: String(form.get("description") || "").trim() || null,
     imageUrl: String(form.get("imageUrl") || ""),
     pieceCount: Number(form.get("pieceCount") || 9),
     rewardType: String(form.get("rewardType") || "PERCENTAGE_DISCOUNT") as
@@ -85,6 +90,9 @@ export default function PuzzleEdit() {
   const initialForm = useMemo(
     () => ({
       name: config?.name ?? "",
+      badgeLabel: config?.badgeLabel ?? "",
+      headline: config?.headline ?? "",
+      description: config?.description ?? "",
       imageUrl: config?.imageUrl ?? "",
       pieceCount: String(config?.pieceCount ?? 9),
       rewardType: config?.rewardType ?? "PERCENTAGE_DISCOUNT",
@@ -262,9 +270,40 @@ export default function PuzzleEdit() {
             <s-section heading="Puzzle details">
               <s-text-field
                 label="Puzzle name"
+                details="Only you see this — it names the puzzle in your list."
                 value={form.name}
                 onChange={(event) =>
                   setField("name", event.currentTarget.value)
+                }
+              />
+
+              <s-text-field
+                label="Badge"
+                details="Small label above the headline. Leave empty to hide."
+                placeholder="Win a reward"
+                value={form.badgeLabel}
+                onChange={(event) =>
+                  setField("badgeLabel", event.currentTarget.value)
+                }
+              />
+
+              <s-text-field
+                label="Headline"
+                details="Shown to shoppers above the puzzle."
+                placeholder="Solve the puzzle, claim your discount"
+                value={form.headline}
+                onChange={(event) =>
+                  setField("headline", event.currentTarget.value)
+                }
+              />
+
+              <s-text-area
+                label="Description"
+                details="One or two lines under the headline."
+                rows={2}
+                value={form.description}
+                onChange={(event) =>
+                  setField("description", event.currentTarget.value)
                 }
               />
 
