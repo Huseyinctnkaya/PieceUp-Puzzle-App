@@ -1,21 +1,25 @@
 import type { LoaderFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
-// Imported on the server only. The admin page can't import this module in the
-// browser: Vite would serve it at /extensions/pieceup-widget/assets/jigsaw.js,
-// but `shopify app dev`'s proxy claims the /extensions/* path for the theme
-// extension's own asset server, rewrites it to /assets/jigsaw.js, and 404s.
-// Computing the geometry here keeps a single copy of the piece math — the
-// preview stays honest because it runs the exact code the storefront runs.
+// The storefront's own geometry, imported on the server only. The admin page
+// can't import it in the browser: Vite would serve it under /extensions/..,
+// but `shopify app dev`'s proxy claims that path for the theme extension's
+// asset server and 404s. Computing it here keeps one copy of the piece math,
+// so the merchant previews the shapes their shoppers actually get.
 import {
-  buildPieces,
-  buildPiecePath,
-  gridFor,
-} from "../../extensions/pieceup-widget/assets/jigsaw.js";
+  parcalariUret,
+  parcaPathUret,
+} from "../../extensions/pieceup-widget/src/lib/puzzle";
+
+/** Rows and columns from a piece count, matching the storefront's mount. */
+function gridFor(pieceCount: number) {
+  const rows = Math.ceil(Math.sqrt(pieceCount));
+  return { rows, cols: Math.ceil(pieceCount / rows) };
+}
 
 /** Cell size for the admin panel — smaller than the storefront's, same shapes. */
 const CELL = 72;
-/** Must match the storefront's TAB_RATIO, or the preview would lie about fit. */
-const TAB_RATIO = 0.2;
+/** Matches the storefront's default knob size (24 on a 0..100 scale). */
+const TAB_RATIO = 0.24;
 
 export async function loader({ request }: LoaderFunctionArgs) {
   await authenticate.admin(request);
@@ -30,13 +34,15 @@ export async function loader({ request }: LoaderFunctionArgs) {
   // puzzle their shoppers will be given — same edges, same scatter.
   const seed = `${imageUrl}:${rows}x${cols}`;
 
-  const pieces = buildPieces(rows, cols, seed).map((piece) => ({
-    index: piece.index,
-    row: piece.row,
-    col: piece.col,
-    tilt: piece.tilt,
-    trayOrder: piece.trayOrder,
-    path: buildPiecePath(piece.edges, CELL, CELL, tab),
+  // Translated out of the reference's vocabulary here, so the admin page keeps
+  // working in the same shape it always has.
+  const pieces = parcalariUret(rows, cols, seed).map((piece) => ({
+    index: piece.indeks,
+    row: piece.satir,
+    col: piece.sutun,
+    tilt: piece.egiklik,
+    trayOrder: piece.tepsiSira,
+    path: parcaPathUret(piece.kenarlar, CELL, CELL, tab),
   }));
 
   return {

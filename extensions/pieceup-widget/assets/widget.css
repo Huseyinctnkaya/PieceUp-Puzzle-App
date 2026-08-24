@@ -1,9 +1,11 @@
+/* The popup chrome only. Everything inside it — board, tray, pieces, reward
+   panel — is the reference puzzle, which ships its own stylesheet in
+   pieceup-app.css. */
+
 /* A theme app extension inherits whatever CSS the merchant's theme ships, so a
    global `box-sizing: border-box` reset cannot be assumed. Under the default
-   content-box, `width: 100%` plus padding makes every one of our boxes wider
-   than its parent — which pushed the tray past the card edge and clipped the
-   pieces against it. Scoped to our own subtree: a global reset here would
-   change the merchant's storefront layout. */
+   content-box, `width: 100%` plus padding makes a box wider than its parent.
+   Scoped to our own subtree: a global reset here would change the storefront. */
 .pieceup-overlay,
 .pieceup-overlay *,
 .pieceup-overlay *::before,
@@ -23,40 +25,31 @@
   padding: 16px;
 }
 
-/* Author rules always win over the user-agent [hidden] stylesheet rule in
-   the CSS cascade, regardless of specificity or source order, so the
-   `display: flex` above would otherwise keep the overlay visible (and
-   intercepting pointer events across the whole page) even while
-   widget.js sets overlay.hidden = true. */
+/* Author rules always beat the user-agent [hidden] rule, regardless of
+   specificity, so the `display: flex` above would otherwise keep the overlay
+   covering the whole page — and swallowing its clicks — while widget.js
+   believes it is closed. */
 .pieceup-overlay[hidden] {
   display: none;
 }
 
-/* The width chain matters: the board is sized as a percentage of the stage,
-   so every ancestor needs a definite width or the whole puzzle collapses to
-   zero. Sized against the viewport so the puzzle uses the space available
-   instead of sitting in a small box with its own scrollbar. */
 .pieceup-popup {
   position: relative;
   background: #fff;
   border-radius: 18px;
-  /* Extra top room so the card header clears the floating close button. */
+  /* Extra top room so the puzzle's own heading clears the close button. */
   padding: 52px 20px 20px;
   width: min(1080px, 96vw);
   max-height: 94vh;
   overflow: auto;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
-  font-family:
-    "Inter Tight",
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    Roboto,
-    sans-serif;
 }
 
-/* Taken out of flow so it sits in the popup's corner instead of pushing the
-   card down, and sized to the 44px touch target a thumb needs. */
+.pieceup-content {
+  width: 100%;
+}
+
+/* Out of flow, in the popup's corner, at a size a thumb can hit. */
 .pieceup-close {
   position: absolute;
   top: 10px;
@@ -90,439 +83,6 @@
   outline-offset: 2px;
 }
 
-.pieceup-content {
-  width: 100%;
-}
-
-/* Merchant copy above the card. Centred and narrow: it is a campaign heading,
-   not body text, and long lines read badly over a wide popup. */
-.pieceup-intro {
-  max-width: 620px;
-  margin: 0 auto 22px;
-  text-align: center;
-}
-
-.pieceup-intro-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 31px;
-  padding: 0 14px 0 11px;
-  margin: 0 0 14px;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.04);
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
-  font-size: 12.5px;
-  font-weight: 600;
-  color: #1a1a1a;
-  opacity: 0.85;
-}
-
-.pieceup-intro-icon {
-  width: 19px;
-  height: 19px;
-  opacity: 0.95;
-}
-
-.pieceup-intro-title {
-  margin: 0;
-  font-size: clamp(24px, 3.2vw, 38px);
-  line-height: 1.1;
-  font-weight: 600;
-  letter-spacing: -0.03em;
-  color: #1a1a1a;
-  text-wrap: balance;
-}
-
-.pieceup-intro-text {
-  margin: 10px auto 0;
-  max-width: 46ch;
-  font-size: 15px;
-  line-height: 1.55;
-  color: #1a1a1a;
-  opacity: 0.55;
-}
-
-.pieceup-card {
-  width: 100%;
-  border: 1px solid rgba(0, 0, 0, 0.07);
-  border-radius: 14px;
-  overflow: hidden;
-  background: #fff;
-}
-
-.pieceup-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-  padding: 12px 16px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.07);
-}
-
-.pieceup-progress-group {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
-
-.pieceup-progress-pips {
-  display: flex;
-  gap: 4px;
-}
-
-.pieceup-pip {
-  width: 14px;
-  height: 4px;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.12);
-  transition: background 220ms ease;
-}
-
-.pieceup-pip.is-on {
-  background: #1a1a1a;
-}
-
-.pieceup-progress-bar {
-  position: relative;
-  width: 120px;
-  height: 4px;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.12);
-  overflow: hidden;
-}
-
-.pieceup-progress-fill {
-  display: block;
-  height: 100%;
-  width: 0;
-  background: #1a1a1a;
-  transition: width 220ms ease;
-}
-
-.pieceup-progress-label,
-.pieceup-badge,
-.pieceup-shuffle {
-  font-size: 13px;
-  line-height: 1;
-  white-space: nowrap;
-}
-
-.pieceup-progress-label {
-  color: rgba(0, 0, 0, 0.62);
-}
-
-.pieceup-controls {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.pieceup-badge {
-  padding: 7px 10px;
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.05);
-  color: #1a1a1a;
-  font-weight: 500;
-}
-
-.pieceup-shuffle {
-  padding: 7px 10px;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  color: rgba(0, 0, 0, 0.62);
-  cursor: pointer;
-}
-
-.pieceup-shuffle:hover:not(:disabled) {
-  background: rgba(0, 0, 0, 0.05);
-  color: #1a1a1a;
-}
-
-.pieceup-shuffle:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-
-/* The stage is one coordinate space holding the board, the tray and every
-   piece. Pieces are absolutely positioned against it, which is what lets a
-   drag from tray to board be one continuous movement rather than a handoff
-   between two containers. */
-.pieceup-stage {
-  /* The height the board may occupy. Read by the board's max-width (set in
-     board.js from the image's ratio), so a height cap narrows the board
-     rather than distorting it. */
-  --pieceup-board-height: 44vh;
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 16px;
-  width: 100%;
-  touch-action: none;
-  -webkit-user-select: none;
-  user-select: none;
-  -webkit-tap-highlight-color: transparent;
-}
-
-/* Board and tray side by side once there's room. Deliberately flex-start
-   rather than stretch: stretching would pull on the board's aspect-ratio and
-   feed back into the measurements that decide the layout. The breakpoint here
-   must match SIDE_BY_SIDE_MIN_WIDTH in board.js. */
-@media (min-width: 860px) {
-  .pieceup-stage {
-    flex-direction: row;
-    align-items: flex-start;
-  }
-
-  .pieceup-stage {
-    --pieceup-board-height: 74vh;
-  }
-
-  .pieceup-board {
-    flex: 1 1 60%;
-  }
-
-  .pieceup-tray {
-    flex: 1 1 40%;
-  }
-}
-
-/* Height is capped, not just width. Stacked under the tray, an uncapped board
-   pushed the pieces past the bottom of the popup — visible only by scrolling,
-   which is no use when the pieces are what you're meant to drag. Sizing from
-   height (with max-width as the other bound) keeps the image's proportions
-   instead of stretching it to fill. */
-.pieceup-board {
-  position: relative;
-  width: 100%;
-  max-width: 100%;
-  max-height: var(--pieceup-board-height);
-  aspect-ratio: 1;
-  background-color: #f1f1f1;
-  background-size: cover;
-  background-position: center;
-  border: 1px solid rgba(0, 0, 0, 0.05);
-  border-radius: 10px;
-  overflow: hidden;
-}
-
-.pieceup-slots {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-}
-
-.pieceup-slot {
-  fill: rgba(255, 255, 255, 0.06);
-  stroke: rgba(0, 0, 0, 0.16);
-  stroke-width: 1;
-  stroke-dasharray: 4 4;
-}
-
-.pieceup-slot.is-filled {
-  fill: transparent;
-  stroke: transparent;
-}
-
-/* Invisible click targets over each slot, for the tap-to-select flow. They're
-   disabled unless a piece is selected, so they never swallow pointer events
-   meant for the pieces. */
-.pieceup-slot-button {
-  position: absolute;
-  padding: 0;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  z-index: 15;
-}
-
-.pieceup-slot-button:disabled {
-  cursor: default;
-  pointer-events: none;
-}
-
-.pieceup-tray {
-  position: relative;
-  width: 100%;
-  border: 1px solid rgba(0, 0, 0, 0.05);
-  border-radius: 10px;
-  background: #fafafa;
-}
-
-/* The start gate, over the board and tray. Frosted rather than opaque so the
-   finished picture stays visible underneath — the reward is the invitation. */
-.pieceup-gate {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  z-index: 30;
-  border-radius: 10px;
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.16),
-    rgba(255, 255, 255, 0.42)
-  );
-  backdrop-filter: blur(2.5px) saturate(1.4);
-  -webkit-backdrop-filter: blur(2.5px) saturate(1.4);
-}
-
-.pieceup-stage:not(.is-gated) .pieceup-gate {
-  display: none;
-}
-
-/* Hidden rather than absent: the pieces keep their laid-out positions, so
-   starting the game animates them from the tray instead of popping them in. */
-.pieceup-stage.is-gated .pieceup-piece,
-.pieceup-stage.is-gated .pieceup-slots {
-  visibility: hidden;
-}
-
-.pieceup-gate-box {
-  max-width: 340px;
-  text-align: center;
-}
-
-.pieceup-start {
-  height: 46px;
-  padding: 0 28px;
-  border: 0;
-  border-radius: 999px;
-  background-color: #1a1a1a;
-  background-image: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.22),
-    rgba(255, 255, 255, 0.04) 46%,
-    rgba(0, 0, 0, 0.1)
-  );
-  color: #fff;
-  font: inherit;
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: -0.012em;
-  cursor: pointer;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.32),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.16),
-    0 1px 2px rgba(0, 0, 0, 0.16),
-    0 10px 22px -8px rgba(0, 0, 0, 0.42);
-  transition:
-    transform 160ms cubic-bezier(0.16, 1, 0.3, 1),
-    box-shadow 200ms ease;
-}
-
-.pieceup-start:hover {
-  transform: translateY(-1px);
-}
-
-.pieceup-start:active {
-  transform: translateY(0);
-}
-
-.pieceup-gate-hint {
-  margin: 14px 0 0;
-  font-size: 13px;
-  line-height: 1.5;
-  opacity: 0.6;
-}
-
-.pieceup-defs {
-  position: absolute;
-  width: 0;
-  height: 0;
-}
-
-.pieceup-piece {
-  position: absolute;
-  transform-origin: center center;
-  cursor: grab;
-  touch-action: none;
-  /* Positional moves animate; dragging turns this off so the piece tracks the
-     finger exactly rather than lagging behind it. */
-  transition:
-    left 220ms cubic-bezier(0.2, 0.9, 0.3, 1),
-    top 220ms cubic-bezier(0.2, 0.9, 0.3, 1),
-    transform 220ms cubic-bezier(0.2, 0.9, 0.3, 1);
-  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.28));
-}
-
-.pieceup-piece.is-dragging {
-  transition: none;
-  cursor: grabbing;
-  filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.32));
-}
-
-.pieceup-piece.is-placed {
-  cursor: default;
-  pointer-events: none;
-  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.18));
-}
-
-.pieceup-piece.is-selected .pieceup-piece-outline path {
-  stroke: #005bd3;
-  stroke-width: 2.5;
-}
-
-.pieceup-piece:focus-visible {
-  outline: 2px solid #005bd3;
-  outline-offset: 2px;
-}
-
-/* A short settle once a piece lands, so placing one feels like it clicked in
-   rather than merely stopping. */
-.pieceup-piece.just-placed {
-  animation: pieceup-settle 320ms ease-out;
-}
-
-@keyframes pieceup-settle {
-  0% {
-    transform: scale(1.06);
-  }
-  60% {
-    transform: scale(0.985);
-  }
-  100% {
-    transform: scale(1);
-  }
-}
-
-.pieceup-piece-face {
-  position: absolute;
-  inset: 0;
-  background-repeat: no-repeat;
-}
-
-/* Fallback when the puzzle image can't be loaded: without a fill the pieces
-   are invisible and the tray reads as empty. */
-.pieceup-image-failed .pieceup-piece-face {
-  background-color: #b9bec4;
-}
-
-.pieceup-image-failed .pieceup-board {
-  background-color: #ececed;
-}
-
-.pieceup-piece-outline {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-}
-
-.pieceup-piece-outline path {
-  stroke: rgba(255, 255, 255, 0.85);
-  stroke-width: 1.25;
-}
-
 .pieceup-trigger {
   position: fixed;
   bottom: 20px;
@@ -544,13 +104,4 @@
   border-radius: 8px;
   font-size: 18px;
   text-align: center;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .pieceup-piece,
-  .pieceup-piece.just-placed,
-  .pieceup-start {
-    transition: none;
-    animation: none;
-  }
 }

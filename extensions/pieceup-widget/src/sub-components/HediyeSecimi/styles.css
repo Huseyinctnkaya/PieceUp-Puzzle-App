@@ -1,0 +1,116 @@
+/* Hediye şeridi — ödül şeridinin altında, aynı kartın içinde */
+.hediye-serit {
+  padding: 18px 4px 4px;
+  border-top: 1px solid rgba(0, 0, 0, 0.07);
+  margin-top: 16px;
+  animation: hediye-gir 380ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes hediye-gir {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Tahtanın üstünde gösterilen sade sürüm */
+.hediye-serit.sade {
+  padding: 0;
+  margin-top: 0;
+  border-top: 0;
+  width: 100%;
+}
+
+.hediye-serit.sade .hediye-basliklar {
+  justify-content: center;
+  margin-bottom: 14px;
+}
+
+.hediye-serit.sade .hediye-baslik {
+  font-size: 16px;
+}
+
+.hediye-serit.sade .hediye-kart-alani {
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: 8px;
+}
+
+.hediye-serit.sade .hediye-onay {
+  text-align: center;
+}
+
+.hediye-basliklar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  margin-bottom: 12px;
+}
+
+.hediye-baslik {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.hediye-aciklama {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  opacity: 0.55;
+}
+
+.hediye-kart-alani {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px;
+  align-items: stretch;
+}
+
+/* Runtime kartları tek bir sarmalayıcının içine basarsa o sarmalayıcı
+   şeffaflaşır ve kartlar doğrudan grid hücresi olur. */
+.hediye-kart-alani > div:only-child {
+  display: contents;
+}
+
+.hediye-kart-alani > * > .hediye-karti {
+  height: 100%;
+}
+
+.hediye-bos {
+  margin: 0;
+  padding: 18px;
+  border: 1px dashed rgba(0, 0, 0, 0.16);
+  border-radius: 12px;
+  font-size: 13px;
+  text-align: center;
+  opacity: 0.6;
+}
+
+.hediye-onay {
+  margin: 12px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+@media (max-width: 560px) {
+  .hediye-serit.sade .hediye-kart-alani {
+    grid-template-columns: repeat(auto-fit, minmax(108px, 1fr));
+  }
+
+  .hediye-kart-alani {
+    grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+    gap: 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hediye-serit {
+    animation: none;
+  }
+}

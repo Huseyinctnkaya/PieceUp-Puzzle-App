@@ -5,6 +5,7 @@
   data-trigger-page="{% if template.name == 'product' %}PRODUCT{% elsif template.name == 'cart' %}CART{% else %}ALL{% endif %}"
 ></div>
 <link rel="stylesheet" href="{{ 'widget.css' | asset_url }}">
+<link rel="stylesheet" href="{{ 'pieceup-app.css' | asset_url }}">
 <script type="module">
   import { initPieceUp } from "{{ 'widget.js' | asset_url }}";
   document.addEventListener("DOMContentLoaded", () => {

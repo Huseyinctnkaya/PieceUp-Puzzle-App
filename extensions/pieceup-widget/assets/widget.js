@@ -5,7 +5,7 @@ import {
   submitCompletion,
   trackOpen,
 } from "./api.js";
-import { renderBoard } from "./board.js";
+import { mountPuzzle } from "./pieceup-app.js";
 
 export async function initPieceUp(root) {
   const config = await fetchConfig();
@@ -60,10 +60,13 @@ function buildPopup(root, config, alreadyPlayed, identityKey) {
     if (alreadyPlayed) {
       renderMessage(content, "You've already played — thanks!");
     } else {
-      renderPuzzle(content, config, async () => {
+      const puzzle = mountPuzzle(content, config, async () => {
         try {
           const code = await submitCompletion(identityKey);
-          renderMessage(content, `Congratulations! Your code: ${code}`);
+          // Handed to the puzzle's own reward panel rather than replacing the
+          // whole popup: the reference shows the code in place, over the
+          // finished picture, and that is the moment worth keeping.
+          puzzle.setRewardCode(code);
         } catch (err) {
           // The shop hit its plan's monthly reward allowance. That's not the
           // shopper's fault and retrying won't help, so don't tell them to.
@@ -112,8 +115,4 @@ function renderMessage(container, text) {
   message.className = "pieceup-message";
   message.textContent = text;
   container.appendChild(message);
-}
-
-function renderPuzzle(container, config, onComplete) {
-  renderBoard(container, config, onComplete);
 }
