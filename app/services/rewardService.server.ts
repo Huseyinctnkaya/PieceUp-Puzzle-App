@@ -7,7 +7,6 @@ type UserError = { field?: string[] | null; message: string };
 const DISCOUNT_CODE_CREATE = `#graphql
   mutation discountCodeBasicCreate($basicCodeDiscount: DiscountCodeBasicInput!) {
     discountCodeBasicCreate(basicCodeDiscount: $basicCodeDiscount) {
-      codeDiscountNode { id }
       userErrors { field message }
     }
   }
@@ -16,7 +15,6 @@ const DISCOUNT_CODE_CREATE = `#graphql
 const FREE_SHIPPING_CREATE = `#graphql
   mutation discountCodeFreeShippingCreate($freeShippingCodeDiscount: DiscountCodeFreeShippingInput!) {
     discountCodeFreeShippingCreate(freeShippingCodeDiscount: $freeShippingCodeDiscount) {
-      codeDiscountNode { id }
       userErrors { field message }
     }
   }
@@ -91,10 +89,8 @@ function customerGetsFor(reward: RewardConfig) {
 
 /** What either discount mutation returns, as far as this file cares. */
 type DiscountResponse = {
-  data?: Record<
-    string,
-    { codeDiscountNode?: { id: string } | null; userErrors?: UserError[] }
-  >;
+  data?: Record<string, { userErrors?: UserError[] }>;
+  errors?: Array<{ message: string }>;
 };
 
 function assertNoErrors(
@@ -103,11 +99,13 @@ function assertNoErrors(
 ) {
   const result = json.data?.[field];
   const userErrors = result?.userErrors ?? [];
-  if (!result?.codeDiscountNode || userErrors.length > 0) {
+  const messages = [
+    ...(json.errors ?? []).map((error) => error.message),
+    ...userErrors.map((error) => error.message),
+  ];
+  if (!result || messages.length > 0) {
     throw new Error(
-      `Discount code creation failed: ${userErrors
-        .map((error) => error.message)
-        .join(", ")}`,
+      `Discount code creation failed: ${messages.join(", ") || "Unknown Shopify response"}`,
     );
   }
 }

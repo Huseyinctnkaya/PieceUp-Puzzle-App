@@ -116,6 +116,46 @@ describe("issueRewardCode", () => {
     expect(input.appliesOncePerCustomer).toBe(true);
   });
 
+  it("does not request discount data that needs read_discounts", async () => {
+    const { admin, graphql } = fakeAdmin();
+    await issueRewardCode(admin, {
+      discountType: "PERCENTAGE_OFF_ORDER",
+      discountValue: "10",
+    });
+
+    // PieceUp only creates the code and never reads the returned discount. The
+    // node selection unnecessarily adds read_discounts to a write-only action.
+    expect(graphql.mock.calls[0][0]).not.toContain("codeDiscountNode");
+  });
+
+  it("accepts a successful write-only response with no discount node", async () => {
+    const graphql = vi.fn().mockResolvedValue({
+      json: async () => ({
+        data: { discountCodeBasicCreate: { userErrors: [] } },
+      }),
+    });
+
+    await expect(
+      issueRewardCode({ graphql } as unknown as AdminApiContext, {
+        discountType: "PERCENTAGE_OFF_ORDER",
+        discountValue: "10",
+      }),
+    ).resolves.toMatch(/^PIECEUP-/);
+  });
+
+  it("surfaces top-level GraphQL errors", async () => {
+    const graphql = vi.fn().mockResolvedValue({
+      json: async () => ({ errors: [{ message: "Access denied" }] }),
+    });
+
+    await expect(
+      issueRewardCode({ graphql } as unknown as AdminApiContext, {
+        discountType: "PERCENTAGE_OFF_ORDER",
+        discountValue: "10",
+      }),
+    ).rejects.toThrow("Access denied");
+  });
+
   it("throws when Shopify reports an error", async () => {
     const graphql = vi.fn().mockResolvedValue({
       json: async () => ({
