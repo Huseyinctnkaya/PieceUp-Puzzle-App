@@ -12,6 +12,13 @@ export type PreviewSettings = {
   shuffleLimit: number;
   giftStep: boolean;
   giftBoxMode: boolean;
+  /** The prizes on offer. Without these the gift step opens on an empty choice. */
+  gifts: {
+    title: string;
+    description: string;
+    badgeLabel: string;
+    imageUrl: string;
+  }[];
   badgeLabel: string;
   headline: string;
   description: string;

@@ -799,6 +799,9 @@ export default function PuzzleEdit() {
                       shuffleLimit: Number(form.shuffleLimit),
                       giftStep: form.giftStep === "true",
                       giftBoxMode: form.giftBoxMode === "true",
+                      // Straight from the editor, not from the saved puzzle, so
+                      // a prize can be previewed before it has been saved.
+                      gifts,
                       badgeLabel: form.badgeLabel,
                       headline: form.headline,
                       description: form.description,
