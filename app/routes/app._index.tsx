@@ -71,49 +71,29 @@ function Collapsible({
 }
 
 /**
- * Answers to what merchants actually ask, each one true of how the app works
- * rather than of how apps like it usually work.
+ * The few things merchants actually get caught out by, answered against what
+ * the code does rather than what apps like this usually do.
  */
 const FAQ = [
   {
     question: "How do shoppers see the puzzle?",
     answer:
-      "Through the app embed in your theme. Turn it on in the theme editor and the puzzle appears on your storefront — you choose whether it opens from a button, on its own after a delay, or both.",
-  },
-  {
-    question: "Can I run more than one puzzle at a time?",
-    answer:
-      "You can build as many as you like, but only one can be active. Activating another asks you to deactivate the current one first, so there is never a question of which puzzle a shopper is playing.",
-  },
-  {
-    question: "What does a shopper actually win?",
-    answer:
-      "Whichever prize they land on. A prize can take a percentage or a fixed amount off the whole order or off products you choose, offer free shipping, or be a “try again” that awards nothing.",
+      "Through the app embed in your theme. Turn it on in the theme editor and it appears on your storefront — opening from a button, on its own after a delay, or both.",
   },
   {
     question: "Do the discounts show up in my Shopify admin?",
     answer:
-      "Yes. Each win creates a real discount code under Discounts, which reports and can be edited or deleted like any other. They are created when a shopper wins, not when you set the prize up — so a prize you have configured but nobody has won yet will not be there.",
+      "Yes, as real discount codes under Discounts. They are created when a shopper wins, not when you set the prize up, so a prize nobody has won yet will not be there.",
   },
   {
-    question: "Can a winning code be shared around?",
+    question: "Can I run more than one puzzle at a time?",
     answer:
-      "No. Every code is generated for the shopper who won it: single use, one per customer, and valid for seven days.",
-  },
-  {
-    question: "How often can the same person play?",
-    answer:
-      "Once ever, or once a day — your choice, set on the puzzle. Shoppers are recognised by their customer account when they are signed in, and by their browser when they are not.",
+      "Build as many as you like, but only one can be active — so there is never a question of which puzzle a shopper is playing.",
   },
   {
     question: "What happens when I hit my plan's reward limit?",
     answer:
-      "Shoppers can still play, but no new codes are issued until the month rolls over or you upgrade. The Free plan covers 100 rewards a month and one puzzle; Pro raises that to 1,000 and unlimited puzzles; Premium is unlimited.",
-  },
-  {
-    question: "Who makes PieceUp?",
-    answer:
-      "34devs. If something is not working or you want a feature that is not here, email us — we read everything.",
+      "Shoppers can still play, but no new codes are issued until the month rolls over or you upgrade. Free covers 100 rewards a month, Pro 1,000, Premium unlimited.",
   },
 ] as const;
 
@@ -342,38 +322,35 @@ export default function Dashboard() {
         </s-grid>
 
         <s-section heading="Frequently asked questions">
-          <s-stack gap="small-200">
-            {FAQ.map((entry, index) => (
-              <s-box
-                key={entry.question}
-                border="base"
-                borderRadius="base"
-                padding="base"
+          {/* Divided rather than boxed: four questions in four cards weighed
+              more than the answers are worth. */}
+          {FAQ.map((entry, index) => (
+            <s-stack key={entry.question} gap="none">
+              {index > 0 ? <s-divider /> : null}
+              <s-clickable
+                padding="small"
+                onClick={() => setOpenFaq(openFaq === index ? -1 : index)}
               >
-                <s-stack gap="small-200">
-                  <s-stack
-                    direction="inline"
-                    gap="small-200"
-                    alignItems="center"
-                    justifyContent="space-between"
-                  >
-                    <s-text type="strong">{entry.question}</s-text>
-                    <s-button
-                      variant="tertiary"
-                      icon={openFaq === index ? "chevron-up" : "chevron-down"}
-                      accessibilityLabel={
-                        openFaq === index ? "Collapse answer" : "Show answer"
-                      }
-                      onClick={() => setOpenFaq(openFaq === index ? -1 : index)}
-                    />
-                  </s-stack>
-                  <Collapsible open={openFaq === index}>
-                    <s-text color="subdued">{entry.answer}</s-text>
-                  </Collapsible>
+                <s-stack
+                  direction="inline"
+                  gap="small-200"
+                  alignItems="center"
+                  justifyContent="space-between"
+                >
+                  <s-text>{entry.question}</s-text>
+                  <s-icon
+                    type={openFaq === index ? "chevron-up" : "chevron-down"}
+                    tone="neutral"
+                  />
                 </s-stack>
-              </s-box>
-            ))}
-          </s-stack>
+              </s-clickable>
+              <Collapsible open={openFaq === index}>
+                <s-box paddingInline="small" paddingBlockEnd="small">
+                  <s-text color="subdued">{entry.answer}</s-text>
+                </s-box>
+              </Collapsible>
+            </s-stack>
+          ))}
         </s-section>
 
         <s-section heading="Need help?">
