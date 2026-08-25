@@ -70,6 +70,11 @@ function durumuSil(anahtar: string): void {
   }
 }
 
+/** PieceUp host'u ödülü teslim ettikten sonra tamamlanmış turu unutturur. */
+export function kayitliPuzzleDurumunuSil(anahtar: string): void {
+  durumuSil(anahtar);
+}
+
 export function PuzzleKampanya(props: Props) {
   const {
     ustEtiket,
@@ -176,6 +181,13 @@ export function PuzzleKampanya(props: Props) {
       setHamle(kayit.hamle ?? 0);
       setYerlesenler(Array.isArray(kayit.yerlesenler) ? kayit.yerlesenler : []);
       setDurum("tamamlandi");
+      // Hediye adımı varsa ziyaretçi seçimini kaldığı ödül ekranında yapar.
+      // Doğrudan ödüllü akışta ise host kod isteğini yeniden denemelidir; başarılı
+      // istek zaten bu kaydı sildiği için burada yalnızca teslim edilmemiş bir
+      // ödül bulunabilir.
+      if (!hediyeAdimiAktif) {
+        (props as { onTamamlandi?: () => void }).onTamamlandi?.();
+      }
       return;
     }
     // PieceUp eklemesi: host yarım turu geri yüklemeyi kapatabilir. Kazanılan
@@ -194,7 +206,12 @@ export function PuzzleKampanya(props: Props) {
     setHamle(kayit.hamle ?? 0);
     setYerlesenler(Array.isArray(kayit.yerlesenler) ? kayit.yerlesenler : []);
     if ((kayit.yerlesenler?.length ?? 0) > 0) setDurum("oynaniyor");
-  }, [kaydetmeAnahtari, ilerlemeyiHatirla, sureLimitiAktif]);
+  }, [
+    kaydetmeAnahtari,
+    ilerlemeyiHatirla,
+    sureLimitiAktif,
+    hediyeAdimiAktif,
+  ]);
 
   // İlerlemeyi kaydet
   useEffect(() => {

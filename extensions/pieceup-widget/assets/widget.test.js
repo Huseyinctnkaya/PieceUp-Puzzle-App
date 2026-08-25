@@ -18,7 +18,11 @@ beforeEach(async () => {
   // point at whatever an earlier test did.
   vi.clearAllMocks();
   document.body.innerHTML = `<div id="pieceup-root" data-trigger-page="ALL"></div>`;
-  handle = { setRewardCode: vi.fn(), destroy: vi.fn() };
+  handle = {
+    setRewardCode: vi.fn(),
+    clearProgress: vi.fn(),
+    destroy: vi.fn(),
+  };
   vi.mocked(app.mountPuzzle).mockImplementation((container) => {
     // Stands in for the mounted puzzle, so assertions can tell "the puzzle is
     // on screen" from "a message replaced it".
@@ -112,7 +116,19 @@ describe("initPieceUp", () => {
     // Shown in place, over the finished picture, rather than replacing the
     // popup with a bare message.
     expect(handle.setRewardCode).toHaveBeenCalledWith("PIECEUP-TEST");
+    expect(handle.clearProgress).toHaveBeenCalledOnce();
     expect(ui(root).querySelector(".pieceup-message")).toBeNull();
+  });
+
+  it("keeps the completed round when creating the reward fails", async () => {
+    vi.mocked(api.submitCompletion).mockRejectedValue(new Error("network"));
+    const root = document.getElementById("pieceup-root");
+    await initPieceUp(root);
+    await openPopup(root);
+
+    await completionCallback()();
+
+    expect(handle.clearProgress).not.toHaveBeenCalled();
   });
 
   it("explains a spent reward allowance without telling the shopper to retry", async () => {
@@ -154,6 +170,18 @@ describe("initPieceUp", () => {
     expect(overlay.hidden).toBe(false);
     ui(root).querySelector(".pieceup-close").click();
     expect(overlay.hidden).toBe(true);
+    expect(handle.destroy).toHaveBeenCalledOnce();
+  });
+
+  it("mounts a fresh puzzle instance after closing an unfinished round", async () => {
+    const root = document.getElementById("pieceup-root");
+    await initPieceUp(root);
+    await openPopup(root);
+
+    ui(root).querySelector(".pieceup-close").click();
+    await openPopup(root);
+
+    expect(app.mountPuzzle).toHaveBeenCalledTimes(2);
   });
 
   it("closes on Escape, and does nothing on Escape while already closed", async () => {

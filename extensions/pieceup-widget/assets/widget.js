@@ -127,6 +127,13 @@ function createHost(root) {
 }
 
 function buildPopup(root, config, alreadyPlayed, identityKey) {
+  let puzzle = null;
+  // The initial status was fetched when the widget started. Keep it current for
+  // later opens on the same page as well: a limited play becomes spent as soon
+  // as its reward is issued, while an unlimited campaign may mount a fresh
+  // round immediately.
+  let playSpent = alreadyPlayed;
+
   const overlay = document.createElement("div");
   overlay.className = "pieceup-overlay";
   overlay.hidden = true;
@@ -150,12 +157,18 @@ function buildPopup(root, config, alreadyPlayed, identityKey) {
 
   function close() {
     overlay.hidden = true;
+    // A hidden component would keep all of its in-memory piece positions. A
+    // real unmount makes the next open consult only saved state: half-finished
+    // rounds are discarded by the puzzle, completed rounds are restored.
+    puzzle?.destroy();
+    puzzle = null;
+    content.innerHTML = "";
   }
 
   async function open() {
     overlay.hidden = false;
     trackOpen();
-    if (alreadyPlayed) {
+    if (playSpent) {
       renderMessage(content, "You've already played — thanks!");
       return;
     }
@@ -163,8 +176,11 @@ function buildPopup(root, config, alreadyPlayed, identityKey) {
     // Held until the stylesheets are in, so the puzzle is never painted
     // unstyled. Usually already resolved by the time anyone clicks.
     if (root.stylesReady) await root.stylesReady;
+    if (overlay.hidden) return;
 
-    const puzzle = mountPuzzle(
+    puzzle?.destroy();
+    content.innerHTML = "";
+    const activePuzzle = mountPuzzle(
       content,
       // Compact inside a popup for the same reason as in the admin preview:
       // the section's 72px above and below sets the campaign apart from a
@@ -173,13 +189,24 @@ function buildPopup(root, config, alreadyPlayed, identityKey) {
       async (giftIndex) => {
         try {
           const code = await submitCompletion(identityKey, giftIndex);
+          // Completion is now safely recorded by the server. Forget the saved
+          // finished round, but leave the currently mounted reward panel in
+          // place until the shopper closes it.
+          activePuzzle.clearProgress();
+          playSpent = !config.canReplay;
           // Handed to the puzzle's own reward panel rather than replacing the
           // whole popup: the reference shows the code in place, over the
           // finished picture, and that is the moment worth keeping.
           // Null is a "try again" prize rather than a failure: there is no
           // code to show, and the puzzle's panel says so on its own.
-          if (code) puzzle.setRewardCode(code);
+          if (code && puzzle === activePuzzle && !overlay.hidden) {
+            activePuzzle.setRewardCode(code);
+          }
         } catch (err) {
+          if (puzzle === activePuzzle) {
+            activePuzzle.destroy();
+            puzzle = null;
+          }
           // The shop hit its plan's monthly reward allowance. That's not the
           // shopper's fault and retrying won't help, so don't tell them to.
           if (err && err.message === "reward_limit_reached") {
@@ -196,6 +223,7 @@ function buildPopup(root, config, alreadyPlayed, identityKey) {
         }
       },
     );
+    puzzle = activePuzzle;
   }
 
   // Click on the backdrop (not the popup box itself) dismisses the popup.

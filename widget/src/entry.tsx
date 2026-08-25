@@ -7,7 +7,10 @@
  * puzzle itself never learns which platform it is running on.
  */
 import { render, type ComponentChild } from "preact";
-import { PuzzleKampanya } from "./components/PuzzleKampanya";
+import {
+  kayitliPuzzleDurumunuSil,
+  PuzzleKampanya,
+} from "./components/PuzzleKampanya";
 import { PuzzleHediyeKarti } from "./components/PuzzleHediyeKarti";
 import type { Props } from "./components/PuzzleKampanya/types";
 
@@ -88,6 +91,8 @@ function gridFor(pieceCount: number) {
 export type PuzzleHandle = {
   /** Fills in the coupon the reward panel shows, once the server has minted it. */
   setRewardCode(code: string): void;
+  /** Forgets a completed round after its reward has been delivered. */
+  clearProgress(): void;
   destroy(): void;
 };
 
@@ -179,6 +184,9 @@ export function mountPuzzle(
       void onComplete(giftIndex);
     },
   };
+  const progressKey = `${props.karistirmaAnahtari || "kampanya-1"}:${Math.round(
+    props.satirSayisi?.value ?? 3,
+  )}x${Math.round(props.sutunSayisi?.value ?? 3)}`;
 
   function draw() {
     const won = wonSomething();
@@ -215,6 +223,9 @@ export function mountPuzzle(
     setRewardCode(code) {
       rewardCode = code;
       draw();
+    },
+    clearProgress() {
+      kayitliPuzzleDurumunuSil(progressKey);
     },
     destroy() {
       render(null, container);

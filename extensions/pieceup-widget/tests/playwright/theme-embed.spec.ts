@@ -75,12 +75,14 @@ async function finishWith(
   page: import("@playwright/test").Page,
   gift: Record<string, unknown>,
   discountCode: string | null,
+  extraConfig: Record<string, unknown> = {},
 ) {
   await serveConfig(page, {
     pieceCount: 4,
     giftStep: true,
     giftBoxMode: true,
     gifts: [gift],
+    ...extraConfig,
   });
   await page.route("**/apps/pieceup/complete", (route) =>
     route.fulfill({ json: { discountCode } }),
@@ -197,6 +199,73 @@ test("brings a shopper back to the reward they already won", async ({
   // Closing the popup must not cost someone the code they won.
   await expect(page.locator(".hediye-karti")).toHaveCount(1);
   await expect(page.locator(".ortu .ana-buton")).toHaveCount(0);
+});
+
+test("keeps the reward step when the popup is closed before choosing", async ({
+  page,
+}) => {
+  await serveConfig(page, {
+    pieceCount: 4,
+    giftStep: true,
+    giftBoxMode: true,
+    gifts: [{ title: "20% off", awardsPrize: true }],
+  });
+  await withSavedRound(page, {
+    yerlesenler: [0, 1, 2, 3],
+    tamamlandi: true,
+  });
+
+  await page.goto(fixtureUrl);
+  await page.click(".pieceup-trigger");
+  await expect(page.locator(".hediye-karti")).toHaveCount(1);
+
+  await page.click(".pieceup-close");
+  await page.click(".pieceup-trigger");
+
+  await expect(page.locator(".hediye-karti")).toHaveCount(1);
+  await expect(page.locator(".ortu .ana-buton")).toHaveCount(0);
+});
+
+test("forgets the completed round after delivering a reward", async ({
+  page,
+}) => {
+  await finishWith(
+    page,
+    { title: "20% off", awardsPrize: true },
+    "PUZZLE20",
+    { canReplay: true },
+  );
+  await expect(page.locator(".kupon-kodu")).toHaveText("PUZZLE20");
+
+  const saved = await page.evaluate(
+    (image) => localStorage.getItem(`ikas-puzzle:${image}:2x2`),
+    IMAGE,
+  );
+  expect(saved).toBeNull();
+
+  await page.click(".pieceup-close");
+  await page.click(".pieceup-trigger");
+
+  await expect(page.locator(".ortu .ana-buton")).toBeVisible();
+  await expect(page.locator(".ilerleme-yazisi")).toHaveText("0 / 4");
+});
+
+test("retries reward delivery for a restored completed round without gifts", async ({
+  page,
+}) => {
+  await serveConfig(page, { pieceCount: 4, giftStep: false });
+  await page.route("**/apps/pieceup/complete", (route) =>
+    route.fulfill({ json: { discountCode: "PUZZLE20" } }),
+  );
+  await withSavedRound(page, {
+    yerlesenler: [0, 1, 2, 3],
+    tamamlandi: true,
+  });
+
+  await page.goto(fixtureUrl);
+  await page.click(".pieceup-trigger");
+
+  await expect(page.locator(".kupon-kodu")).toHaveText("PUZZLE20");
 });
 
 test("offers another round when the puzzle has no play limit", async ({
