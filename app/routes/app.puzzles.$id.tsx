@@ -717,33 +717,57 @@ export default function PuzzleEdit() {
                         direction="inline"
                         gap="base"
                         alignItems="center"
+                        justifyContent="space-between"
                       >
-                        <s-icon type="drag-handle" tone="neutral" />
-                        <s-stack gap="none">
-                          <s-text type="strong">
-                            {gift.title || "Untitled prize"}
-                          </s-text>
-                          <s-text color="subdued">{describeGift(gift)}</s-text>
+                        {/* Handle and label on one side, actions on the other,
+                            so the buttons line up down the list however long a
+                            prize's name happens to be. */}
+                        <s-stack
+                          direction="inline"
+                          gap="base"
+                          alignItems="center"
+                        >
+                          <s-icon type="drag-handle" tone="neutral" />
+                          <s-stack gap="none">
+                            <s-text type="strong">
+                              {gift.title || "Untitled prize"}
+                            </s-text>
+                            <s-text color="subdued">
+                              {describeGift(gift)}
+                            </s-text>
+                          </s-stack>
                         </s-stack>
-                        <s-button onClick={() => openEditor(index)}>
-                          Edit
-                        </s-button>
-                        <s-button
-                          icon="delete"
-                          tone="critical"
-                          accessibilityLabel="Remove prize"
-                          onClick={() =>
-                            setGifts(gifts.filter((_, i) => i !== index))
-                          }
-                        />
+
+                        <s-stack
+                          direction="inline"
+                          gap="small"
+                          alignItems="center"
+                        >
+                          <s-button onClick={() => openEditor(index)}>
+                            Edit
+                          </s-button>
+                          <s-button
+                            icon="delete"
+                            tone="critical"
+                            accessibilityLabel="Remove prize"
+                            onClick={() =>
+                              setGifts(gifts.filter((_, i) => i !== index))
+                            }
+                          />
+                        </s-stack>
                       </s-stack>
                     </s-box>
                   </div>
                 ))}
 
-                <s-button icon="plus" onClick={() => openEditor(null)}>
-                  Add prize
-                </s-button>
+                {/* Set apart from the list: it acts on the section rather than
+                    on any one prize, and butting it against the last row read
+                    as another row. */}
+                <s-box paddingBlockStart="base">
+                  <s-button icon="plus" onClick={() => openEditor(null)}>
+                    Add prize
+                  </s-button>
+                </s-box>
               </s-section>
             </s-stack>
           </s-grid-item>
