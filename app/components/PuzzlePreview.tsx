@@ -17,59 +17,55 @@ export type PreviewSettings = {
   description: string;
 };
 
+// The reference's own layout constants. The board takes 62% of the card's
+// inner width when the tray sits beside it and all of it when the tray sits
+// below; the card pads itself by 14px a side and never draws a board wider
+// than 620.
+const BOARD_SHARE_BESIDE = 0.62;
+const CARD_PADDING = 28;
+const BOARD_MAX_WIDTH = 620;
+
 /**
- * Shrinks the puzzle until it fits the height it has been given.
+ * How tall the board may be, by where the tray sits.
  *
- * A preview that scrolls is worse than a smaller one: the point is to see the
- * whole thing at once. Measured rather than derived — the height depends on the
- * image's ratio, the tray's position and the merchant's own copy, and guessing
- * at that is how the storefront ended up scrolling in the first place.
- *
- * Runs twice: the first pass reflows the board, and the second settles whatever
- * that changed. Deliberately not a loop — this is a preview, and two passes is
- * already closer than anyone can see.
+ * A tray below the board adds its own height underneath, so the board gets
+ * less. These leave the whole preview around 470px, which fits a modal without
+ * scrolling.
  */
-function fitToHeight(host: HTMLElement, content: HTMLElement) {
-  const shadow = host.shadowRoot;
-  if (!shadow) return;
+const BOARD_HEIGHT_BUDGET = { beside: 240, below: 150 };
 
-  const style = shadow.querySelector("style");
-  if (!style) return;
+/**
+ * The card width that gives a board of the height we have room for.
+ *
+ * Computed rather than measured. The board's height is its width over the
+ * image's ratio, and the layout shares are fixed — so with the ratio in hand
+ * the answer is arithmetic. Earlier versions measured the rendered puzzle and
+ * narrowed it until it fit, which needed the image to have loaded first, and
+ * settled at whatever size the passes happened to reach.
+ */
+function cardWidthFor(ratio: number, trayBeside: boolean) {
+  const budget = trayBeside
+    ? BOARD_HEIGHT_BUDGET.beside
+    : BOARD_HEIGHT_BUDGET.below;
+  const boardWidth = Math.min(BOARD_MAX_WIDTH, budget * ratio);
+  const share = trayBeside ? BOARD_SHARE_BESIDE : 1;
+  return Math.round(
+    Math.min(980, Math.max(280, boardWidth / share + CARD_PADDING)),
+  );
+}
 
-  const apply = () => {
-    const available = host.clientHeight;
-    const needed = content.scrollHeight;
-    if (!available || !needed || needed <= available) return;
-
-    const box = shadow.querySelector(".oyun-kutusu");
-    const board = shadow.querySelector(".tahta");
-    if (!box || !board) return;
-
-    const boxWidth = box.getBoundingClientRect().width;
-    const boardBox = board.getBoundingClientRect();
-    if (!boardBox.height || !boxWidth) return;
-
-    // Everything but the board — heading, copy, the progress bar — keeps its
-    // height as the puzzle narrows, so the board has to absorb the whole
-    // overshoot. Solving for that directly converges; scaling the box by the
-    // overshoot does not, because the heading rewraps taller as it narrows.
-    const fixed = needed - boardBox.height;
-    const boardTarget = available - fixed;
-    if (boardTarget <= 0) return;
-
-    const scale = boardTarget / boardBox.height;
-    const target = Math.max(260, Math.round(boxWidth * scale));
-    style.textContent = `.oyun-kutusu { max-width: ${target}px !important; }`;
-  };
-
-  // Each pass reflows the board, and the heading rewraps around it; three is
-  // where the measurements stop moving in practice.
-  requestAnimationFrame(() => {
-    apply();
-    requestAnimationFrame(() => {
-      apply();
-      requestAnimationFrame(apply);
-    });
+/** Reads an image's aspect ratio, falling back to square if it won't load. */
+function ratioOf(src: string): Promise<number> {
+  return new Promise((resolve) => {
+    const image = new Image();
+    image.onload = () =>
+      resolve(
+        image.naturalWidth && image.naturalHeight
+          ? image.naturalWidth / image.naturalHeight
+          : 1,
+      );
+    image.onerror = () => resolve(1);
+    image.src = src;
   });
 }
 
@@ -139,12 +135,15 @@ function usePuzzleMount(settings: PreviewSettings, open: boolean) {
     shadow.appendChild(link);
 
     // The puzzle's height follows from its width — the board is the image's
-    // aspect ratio — so width is the only lever for making it fit. Capping it
-    // through a variable lets the fit be measured once the real thing has
-    // rendered, rather than predicted from the image ratio and the layout.
+    // aspect ratio — so width is the lever that makes it fit. The heading comes
+    // down with it: at storefront size it is most of the preview's height, and
+    // a modal has none to spare.
     const fit = document.createElement("style");
-    fit.textContent =
-      ".oyun-kutusu { max-width: var(--preview-max-width, 980px) !important; }";
+    fit.textContent = [
+      ".kampanya-baslik { font-size: 26px !important; }",
+      ".kampanya-aciklama { font-size: 13px !important; }",
+      ".kampanya-baslik-alani { margin-bottom: 16px !important; }",
+    ].join("\n");
     shadow.appendChild(fit);
 
     const container = document.createElement("div");
@@ -158,9 +157,16 @@ function usePuzzleMount(settings: PreviewSettings, open: boolean) {
     // even behind @vite-ignore — because such files bypass its transforms. The
     // blob is a module whose only job is to re-export the real one, so the URL
     // is opaque to the bundler and resolved by the browser at runtime.
-    loadPuzzleBundle()
-      .then((puzzle) => {
+    Promise.all([loadPuzzleBundle(), ratioOf(settings.imageUrl)])
+      .then(([puzzle, ratio]) => {
         if (cancelled) return;
+
+        // The reference only puts the tray beside the board above a 901px
+        // window; below that it stacks, whatever the merchant chose.
+        const trayBeside =
+          settings.trayPosition !== "bottom" && window.innerWidth > 901;
+        fit.textContent += `\n.oyun-kutusu { max-width: ${cardWidthFor(ratio, trayBeside)}px !important; }`;
+
         mounted = puzzle.mountPuzzle(
           container,
           {
@@ -176,7 +182,6 @@ function usePuzzleMount(settings: PreviewSettings, open: boolean) {
           },
           () => {},
         );
-        fitToHeight(host, container);
       })
       .catch(() => {
         if (!cancelled) setError(true);
@@ -245,23 +250,13 @@ export function PuzzlePreview({ settings }: { settings: PreviewSettings }) {
         size="large-100"
         onHide={() => setOpen(false)}
       >
-        {/* A definite height is what fitToHeight measures against, and what
-            lets the puzzle be centred in it rather than pinned to the top. */}
         <div
           ref={hostRef}
-          style={{
-            height: "min(70vh, 640px)",
-            // A column so the puzzle keeps the full width — centring on the
-            // inline axis would shrink it to its content instead — while
-            // justify-content centres it vertically in the space.
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "center",
-            // On a short screen the tray stacks under the board and the puzzle
-            // genuinely cannot fit however narrow it gets. Scrolling here keeps
-            // that contained, instead of the whole modal growing past the frame.
-            overflowY: "auto",
-          }}
+          // No height of its own: the puzzle is sized to a height budget when
+          // it mounts, and the modal then wraps it. Giving this a height meant
+          // guessing at the modal's — and guessing over it is what put a
+          // scrollbar on the modal.
+          style={{ display: "flex", flexDirection: "column" }}
         />
       </s-modal>
     </>
