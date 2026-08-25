@@ -692,73 +692,78 @@ export default function PuzzleEdit() {
                   </s-banner>
                 ) : null}
 
-                {gifts.map((gift, index) => (
-                  <div
-                    key={index}
-                    draggable
-                    onDragStart={() => setDragging(index)}
-                    onDragOver={(event) => {
-                      // Without this the drop never fires: the default is to
-                      // refuse, and preventing it is what marks a valid target.
-                      event.preventDefault();
-                      if (dragging !== null && dragging !== index) {
-                        moveGift(dragging, index);
-                        setDragging(index);
-                      }
-                    }}
-                    onDragEnd={() => setDragging(null)}
-                    style={{
-                      cursor: "grab",
-                      opacity: dragging === index ? 0.5 : 1,
-                    }}
-                  >
-                    <s-box padding="base" border="base" borderRadius="base">
-                      <s-stack
-                        direction="inline"
-                        gap="base"
-                        alignItems="center"
-                        justifyContent="space-between"
-                      >
-                        {/* Handle and label on one side, actions on the other,
-                            so the buttons line up down the list however long a
-                            prize's name happens to be. */}
+                {/* Stacked with a gap: the rows are plain divs, so they carry
+                    the drag handlers, and the section's own spacing does not
+                    reach them. */}
+                <s-stack gap="base">
+                  {gifts.map((gift, index) => (
+                    <div
+                      key={index}
+                      draggable
+                      onDragStart={() => setDragging(index)}
+                      onDragOver={(event) => {
+                        // Without this the drop never fires: the default is to
+                        // refuse, and preventing it is what marks a valid target.
+                        event.preventDefault();
+                        if (dragging !== null && dragging !== index) {
+                          moveGift(dragging, index);
+                          setDragging(index);
+                        }
+                      }}
+                      onDragEnd={() => setDragging(null)}
+                      style={{
+                        cursor: "grab",
+                        opacity: dragging === index ? 0.5 : 1,
+                      }}
+                    >
+                      <s-box padding="base" border="base" borderRadius="base">
                         <s-stack
                           direction="inline"
                           gap="base"
                           alignItems="center"
+                          justifyContent="space-between"
                         >
-                          <s-icon type="drag-handle" tone="neutral" />
-                          <s-stack gap="none">
-                            <s-text type="strong">
-                              {gift.title || "Untitled prize"}
-                            </s-text>
-                            <s-text color="subdued">
-                              {describeGift(gift)}
-                            </s-text>
+                          {/* Handle and label on one side, actions on the other,
+                            so the buttons line up down the list however long a
+                            prize's name happens to be. */}
+                          <s-stack
+                            direction="inline"
+                            gap="base"
+                            alignItems="center"
+                          >
+                            <s-icon type="drag-handle" tone="neutral" />
+                            <s-stack gap="none">
+                              <s-text type="strong">
+                                {gift.title || "Untitled prize"}
+                              </s-text>
+                              <s-text color="subdued">
+                                {describeGift(gift)}
+                              </s-text>
+                            </s-stack>
+                          </s-stack>
+
+                          <s-stack
+                            direction="inline"
+                            gap="small"
+                            alignItems="center"
+                          >
+                            <s-button onClick={() => openEditor(index)}>
+                              Edit
+                            </s-button>
+                            <s-button
+                              icon="delete"
+                              tone="critical"
+                              accessibilityLabel="Remove prize"
+                              onClick={() =>
+                                setGifts(gifts.filter((_, i) => i !== index))
+                              }
+                            />
                           </s-stack>
                         </s-stack>
-
-                        <s-stack
-                          direction="inline"
-                          gap="small"
-                          alignItems="center"
-                        >
-                          <s-button onClick={() => openEditor(index)}>
-                            Edit
-                          </s-button>
-                          <s-button
-                            icon="delete"
-                            tone="critical"
-                            accessibilityLabel="Remove prize"
-                            onClick={() =>
-                              setGifts(gifts.filter((_, i) => i !== index))
-                            }
-                          />
-                        </s-stack>
-                      </s-stack>
-                    </s-box>
-                  </div>
-                ))}
+                      </s-box>
+                    </div>
+                  ))}
+                </s-stack>
 
                 {/* Set apart from the list: it acts on the section rather than
                     on any one prize, and butting it against the last row read
