@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /** The settings the preview needs to render the puzzle as a shopper sees it. */
 export type PreviewSettings = {
@@ -127,18 +127,6 @@ export function PuzzlePreview({ settings }: { settings: PreviewSettings }) {
   const [open, setOpen] = useState(false);
   const { hostRef, error } = usePuzzleMount(settings, open);
 
-  const close = useCallback(() => setOpen(false), []);
-
-  // Escape closes it, the way the storefront popup does.
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") close();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [open, close]);
-
   if (!settings.imageUrl) {
     return (
       <s-box
@@ -164,89 +152,32 @@ export function PuzzlePreview({ settings }: { settings: PreviewSettings }) {
         border="base"
       >
         <s-stack gap="base" alignItems="center">
-          <s-text color="subdued">
-            Play it exactly as a shopper would, at full size.
-          </s-text>
-          <s-button variant="primary" onClick={() => setOpen(true)}>
+          <s-text color="subdued">Play it the way a shopper would.</s-text>
+          {/* commandFor is how Polaris opens a modal: App Bridge owns the
+              overlay, so it is sized and positioned for the admin frame
+              instead of a hand-rolled one overflowing it. */}
+          <s-button
+            variant="primary"
+            commandFor="pieceup-preview"
+            command="--show"
+            onClick={() => setOpen(true)}
+          >
             Preview
           </s-button>
           {error ? (
-            <s-text tone="critical">
-              Couldn’t load the preview. Try again.
-            </s-text>
+            <s-text tone="critical">Couldn’t load the preview.</s-text>
           ) : null}
         </s-stack>
       </s-box>
 
-      {open ? (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="Puzzle preview"
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 9999,
-            background: "rgba(0, 0, 0, 0.6)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 16,
-            overflow: "auto",
-          }}
-        >
-          {/* The backdrop is a real button rather than a div with a click
-              handler, so dismissing by clicking away is reachable from the
-              keyboard too. */}
-          <button
-            type="button"
-            aria-label="Close preview"
-            onClick={close}
-            style={{
-              position: "absolute",
-              inset: 0,
-              width: "100%",
-              height: "100%",
-              border: "none",
-              background: "transparent",
-              cursor: "default",
-            }}
-          />
-          <div
-            style={{
-              position: "relative",
-              width: "min(1080px, 96vw)",
-              maxHeight: "94vh",
-              overflow: "auto",
-              background: "#fff",
-              borderRadius: 18,
-              padding: "52px 20px 20px",
-            }}
-          >
-            <button
-              type="button"
-              aria-label="Close preview"
-              onClick={close}
-              style={{
-                position: "absolute",
-                top: 10,
-                right: 10,
-                width: 32,
-                height: 32,
-                border: "none",
-                borderRadius: "50%",
-                background: "rgba(0, 0, 0, 0.05)",
-                fontSize: 20,
-                lineHeight: 1,
-                cursor: "pointer",
-              }}
-            >
-              ×
-            </button>
-            <div ref={hostRef} />
-          </div>
-        </div>
-      ) : null}
+      <s-modal
+        id="pieceup-preview"
+        heading="Preview"
+        size="large-100"
+        onHide={() => setOpen(false)}
+      >
+        <div ref={hostRef} />
+      </s-modal>
     </>
   );
 }
