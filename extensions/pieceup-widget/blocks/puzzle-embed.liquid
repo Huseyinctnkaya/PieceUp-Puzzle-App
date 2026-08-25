@@ -1,15 +1,13 @@
 {% comment %}PieceUp puzzle popup embed{% endcomment %}
 {% comment %}
-  The stylesheets are handed to the script as URLs rather than linked here: the
-  widget renders inside a shadow root, so its styles have to be loaded in there
-  where the theme's own CSS cannot reach them.
+  No stylesheet links here: the widget renders inside a shadow root and loads
+  its own styles in there, where the theme's CSS cannot reach them. It finds
+  them beside its own script, so this block never has to name them.
 {% endcomment %}
 <div
   id="pieceup-root"
   data-customer-id="{{ customer.id }}"
   data-trigger-page="{% if template.name == 'product' %}PRODUCT{% elsif template.name == 'cart' %}CART{% else %}ALL{% endif %}"
-  data-widget-styles="{{ 'widget.css' | asset_url }}"
-  data-puzzle-styles="{{ 'pieceup-app.css' | asset_url }}"
 ></div>
 <script type="module">
   import { initPieceUp } from "{{ 'widget.js' | asset_url }}";

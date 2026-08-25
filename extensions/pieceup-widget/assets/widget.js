@@ -52,13 +52,18 @@ function createHost(root) {
 
   const shadow = root.shadowRoot || root.attachShadow({ mode: "open" });
   // Stylesheets are linked rather than inlined so the browser caches them the
-  // way it does for the rest of the theme's assets. The URLs come from Liquid,
-  // which is the only place that can resolve a theme asset to its CDN address.
-  for (const url of [root.dataset.widgetStyles, root.dataset.puzzleStyles]) {
-    if (!url) continue;
+  // way it does the theme's other assets.
+  //
+  // Resolved against this module's own URL rather than read from the Liquid
+  // block: both files sit beside it in the extension's assets, so this is
+  // correct wherever it is served from, and it cannot break because a theme is
+  // still serving an older copy of the block. Without a stylesheet the trigger
+  // is an unstyled button at the foot of the page instead of a fixed one in
+  // the corner, which reads as the widget simply not being there.
+  for (const file of ["widget.css", "pieceup-app.css"]) {
     const link = document.createElement("link");
     link.rel = "stylesheet";
-    link.href = url;
+    link.href = new URL(file, import.meta.url).href;
     shadow.appendChild(link);
   }
   return shadow;

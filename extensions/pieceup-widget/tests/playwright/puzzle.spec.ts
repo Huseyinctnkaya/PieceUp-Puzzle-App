@@ -209,3 +209,41 @@ test("is not affected by the page's own stylesheet", async ({ page }) => {
   expect(geometry.strays).toBe(0);
   expect(geometry.hidden).toBe(0);
 });
+
+/**
+ * The trigger has to be a button in the corner of the viewport, not merely a
+ * button that exists.
+ *
+ * Its styling lives in the stylesheet the widget loads into its shadow root.
+ * When that failed to load, the trigger fell back to an unstyled button at the
+ * foot of the page — present, clickable, and invisible to anyone looking for
+ * it. Clicking it in a test still passed, which is how this reached a
+ * merchant.
+ */
+test("shows the trigger fixed in the corner of the viewport", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await openPuzzle(page);
+
+  const trigger = page.locator(".pieceup-trigger");
+  await expect(trigger).toBeVisible();
+
+  const placement = await page.evaluate(() => {
+    const button = document
+      .getElementById("pieceup-root")!
+      .shadowRoot!.querySelector(".pieceup-trigger")!;
+    const rect = button.getBoundingClientRect();
+    return {
+      position: getComputedStyle(button).position,
+      width: Math.round(rect.width),
+      fromRight: Math.round(window.innerWidth - rect.right),
+      fromBottom: Math.round(window.innerHeight - rect.bottom),
+    };
+  });
+
+  expect(placement.position).toBe("fixed");
+  expect(placement.width).toBe(56);
+  expect(placement.fromRight).toBe(20);
+  expect(placement.fromBottom).toBe(20);
+});
