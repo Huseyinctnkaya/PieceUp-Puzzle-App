@@ -121,7 +121,7 @@ export async function action({ request }: ActionFunctionArgs) {
   try {
     // A "try again" prize still counts as a play: it is how the merchant caps
     // one go per shopper, and the absence of a code does not undo that.
-    await recordCompletion(session.shop, identityKey, code ?? "");
+    await recordCompletion(session.shop, identityKey, code ?? "", gift.title);
   } catch (error) {
     return new Response(JSON.stringify({ error: "already_played" }), {
       status: 409,

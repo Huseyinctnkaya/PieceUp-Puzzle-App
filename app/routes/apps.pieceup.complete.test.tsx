@@ -247,6 +247,40 @@ describe("apps.pieceup.complete action", () => {
     );
   });
 
+  it("records which prize was won", async () => {
+    vi.mocked(getActivePuzzleConfig).mockResolvedValue({
+      id: "puzzle-1",
+      playLimitType: "ONCE_EVER",
+      gifts: [
+        {
+          title: "10% off",
+          discountType: "PERCENTAGE_OFF_ORDER",
+          discountValue: "10",
+          productIds: "[]",
+          collectionIds: "[]",
+        },
+        {
+          title: "Free shipping",
+          discountType: "FREE_SHIPPING",
+          discountValue: "",
+          productIds: "[]",
+          collectionIds: "[]",
+        },
+      ],
+    } as unknown as Awaited<ReturnType<typeof getActivePuzzleConfig>>);
+
+    await invoke({ identityKey: "device:xyz", giftIndex: 1 });
+
+    // Without the name the analytics cannot say which prizes shoppers land on,
+    // which is the whole question once prizes differ from one another.
+    expect(recordCompletion).toHaveBeenCalledWith(
+      "shop-a.myshopify.com",
+      "device:xyz",
+      "PIECEUP-ABC123",
+      "Free shipping",
+    );
+  });
+
   it("refuses to complete a puzzle with no gifts configured", async () => {
     vi.mocked(getActivePuzzleConfig).mockResolvedValue({
       id: "puzzle-1",

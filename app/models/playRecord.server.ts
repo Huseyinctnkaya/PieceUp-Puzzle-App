@@ -52,6 +52,7 @@ export async function recordCompletion(
   shopDomain: string,
   identityKey: string,
   discountCode: string,
+  prizeTitle: string,
 ): Promise<void> {
   await db.playRecord.create({
     data: {
@@ -60,6 +61,25 @@ export async function recordCompletion(
       playDate: todayDateString(),
       completed: true,
       discountCode,
+      prizeTitle,
     },
   });
+}
+
+/** How many times each prize has been won, most won first. */
+export async function getPrizeWins(shopDomain: string) {
+  const rows = await db.playRecord.groupBy({
+    by: ["prizeTitle"],
+    where: { shopDomain, completed: true, NOT: { prizeTitle: null } },
+    _count: { _all: true },
+  });
+
+  return rows
+    .map((row) => ({
+      title: row.prizeTitle as string,
+      // A prize that awards nothing still leaves a record, so wins and codes
+      // issued are not the same number.
+      won: row._count._all,
+    }))
+    .sort((a, b) => b.won - a.won);
 }

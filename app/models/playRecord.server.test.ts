@@ -36,14 +36,14 @@ afterAll(() => {
 describe("hasAlreadyPlayed / recordCompletion", () => {
   it("is false before any play, true after recordCompletion (ONCE_EVER)", async () => {
     expect(await hasAlreadyPlayed("shop-e.myshopify.com", "device:xyz", "ONCE_EVER")).toBe(false);
-    await recordCompletion("shop-e.myshopify.com", "device:xyz", "PIECEUP-ABC123");
+    await recordCompletion("shop-e.myshopify.com", "device:xyz", "PIECEUP-ABC123", "Prize");
     expect(await hasAlreadyPlayed("shop-e.myshopify.com", "device:xyz", "ONCE_EVER")).toBe(true);
   });
 
   it("rejects a second recordCompletion for the same identity on the same day", async () => {
-    await recordCompletion("shop-f.myshopify.com", "device:xyz", "PIECEUP-A");
+    await recordCompletion("shop-f.myshopify.com", "device:xyz", "PIECEUP-A", "Prize");
     await expect(
-      recordCompletion("shop-f.myshopify.com", "device:xyz", "PIECEUP-B"),
+      recordCompletion("shop-f.myshopify.com", "device:xyz", "PIECEUP-B", "Prize"),
     ).rejects.toThrow();
   });
 });

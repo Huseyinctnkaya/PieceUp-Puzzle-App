@@ -152,6 +152,10 @@ model PlayRecord {
   playDate     String
   completed    Boolean  @default(false)
   discountCode String?
+  /// Which prize was won, by name. Copied rather than referenced: a merchant
+  /// renaming or deleting a prize must not rewrite what happened, and the
+  /// history is only useful if it says what the shopper was actually given.
+  prizeTitle   String?
   playedAt     DateTime @default(now())
 
   @@unique([shopDomain, identityKey, playDate])

@@ -9,6 +9,7 @@ import {
   getTotalsByPuzzle,
 } from "../models/puzzleStat.server";
 import { listPuzzleConfigs } from "../models/puzzleConfig.server";
+import { getPrizeWins } from "../models/playRecord.server";
 
 const RANGE_DAYS = 30;
 
@@ -22,19 +23,22 @@ export async function loader({ request }: LoaderFunctionArgs) {
     return { locked: true as const, planTitle: plan.title };
   }
 
-  const [totals, daily, byPuzzle, puzzles, redemptions] = await Promise.all([
-    getFunnelTotals(session.shop),
-    getDailyStats(session.shop, RANGE_DAYS),
-    getTotalsByPuzzle(session.shop),
-    listPuzzleConfigs(session.shop),
-    getRedemptionStats(admin),
-  ]);
+  const [totals, daily, byPuzzle, puzzles, redemptions, prizeWins] =
+    await Promise.all([
+      getFunnelTotals(session.shop),
+      getDailyStats(session.shop, RANGE_DAYS),
+      getTotalsByPuzzle(session.shop),
+      listPuzzleConfigs(session.shop),
+      getRedemptionStats(admin),
+      getPrizeWins(session.shop),
+    ]);
 
   const names = new Map(puzzles.map((puzzle) => [puzzle.id, puzzle.name]));
 
   return {
     locked: false as const,
     totals,
+    prizeWins,
     daily,
     redemptions,
     rangeDays: RANGE_DAYS,
@@ -169,7 +173,10 @@ export default function StatsPage() {
     );
   }
 
-  const { totals, daily, perPuzzle, redemptions, rangeDays } = data;
+  const { totals, daily, perPuzzle, redemptions, rangeDays, prizeWins } = data;
+  // The share is of prizes won, not of plays: a "try again" is a prize too,
+  // and leaving it out would make the percentages add up to less than a whole.
+  const totalWins = prizeWins.reduce((sum, row) => sum + row.won, 0);
   const unrewarded = Math.max(totals.completed - totals.rewarded, 0);
 
   return (
@@ -293,6 +300,46 @@ export default function StatsPage() {
                     <s-table-cell>
                       <s-badge tone="neutral">
                         {percent(row.completed, row.opened)}
+                      </s-badge>
+                    </s-table-cell>
+                  </s-table-row>
+                ))}
+              </s-table-body>
+            </s-table>
+          )}
+        </s-section>
+
+        <s-section padding="none">
+          <s-box padding="base">
+            <s-heading>By prize</s-heading>
+            <s-text color="subdued">
+              Which prizes shoppers are landing on.
+            </s-text>
+          </s-box>
+
+          {prizeWins.length === 0 ? (
+            <s-box padding="base">
+              <s-text color="subdued">
+                No prizes won yet. This fills in as shoppers finish the puzzle.
+              </s-text>
+            </s-box>
+          ) : (
+            <s-table variant="auto">
+              <s-table-header-row>
+                <s-table-header listSlot="primary">Prize</s-table-header>
+                <s-table-header listSlot="labeled">Won</s-table-header>
+                <s-table-header listSlot="inline">Share</s-table-header>
+              </s-table-header-row>
+              <s-table-body>
+                {prizeWins.map((row) => (
+                  <s-table-row key={row.title}>
+                    <s-table-cell>
+                      <s-text type="strong">{row.title}</s-text>
+                    </s-table-cell>
+                    <s-table-cell>{String(row.won)}</s-table-cell>
+                    <s-table-cell>
+                      <s-badge tone="neutral">
+                        {percent(row.won, totalWins)}
                       </s-badge>
                     </s-table-cell>
                   </s-table-row>
