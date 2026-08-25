@@ -29,6 +29,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
         shuffleLimit: config.shuffleLimit,
         giftStep: config.giftStep,
         giftBoxMode: config.giftBoxMode,
+        gifts: config.gifts.map((gift) => ({
+          title: gift.title,
+          description: gift.description,
+          badgeLabel: gift.badgeLabel,
+          imageUrl: gift.imageUrl,
+        })),
         triggerMode: config.triggerMode,
         triggerPage: config.triggerPage,
         triggerDelaySeconds: config.triggerDelaySeconds,

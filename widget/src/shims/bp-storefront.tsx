@@ -48,16 +48,35 @@ export async function addItemToCart(
   });
 }
 
+/** One entry in a component list: what to render, and what to render it with. */
+export type IkasComponentEntry = {
+  component: ComponentType<Record<string, unknown>>;
+  props?: Record<string, unknown>;
+};
+
 /**
- * ikas renders nested components the merchant dropped into a slot. We have no
- * slot system, so a caller may pass a component directly and it is rendered;
- * otherwise nothing is.
+ * ikas renders the components a merchant dropped into a slot. We have no slot
+ * system — the list is built from the puzzle's own config — so this renders
+ * each entry with the parent's props underneath its own, which is how the gift
+ * cards inherit the campaign's colours and button copy.
  */
 export function IkasComponentRenderer(props: {
-  component?: ComponentType<Record<string, unknown>> | null;
-  props?: Record<string, unknown>;
+  components?: IkasComponentEntry[] | null;
+  parentProps?: Record<string, unknown>;
 }) {
-  const Component = props.component;
-  if (!Component) return null;
-  return <Component {...(props.props ?? {})} />;
+  const entries = props.components ?? [];
+  return (
+    <>
+      {entries.map((entry, index) => {
+        const Component = entry.component;
+        return (
+          <Component
+            key={index}
+            {...(props.parentProps ?? {})}
+            {...(entry.props ?? {})}
+          />
+        );
+      })}
+    </>
+  );
 }

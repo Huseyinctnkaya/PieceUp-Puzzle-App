@@ -8,7 +8,15 @@
  */
 import { render, type ComponentChild } from "preact";
 import { PuzzleKampanya } from "./components/PuzzleKampanya";
+import { PuzzleHediyeKarti } from "./components/PuzzleHediyeKarti";
 import type { Props } from "./components/PuzzleKampanya/types";
+
+export type PieceUpGift = {
+  title: string;
+  description?: string | null;
+  badgeLabel?: string | null;
+  imageUrl?: string | null;
+};
 
 export type PieceUpConfig = {
   badgeLabel?: string | null;
@@ -25,6 +33,7 @@ export type PieceUpConfig = {
   shuffleLimit?: number | null;
   giftStep?: boolean | null;
   giftBoxMode?: boolean | null;
+  gifts?: PieceUpGift[] | null;
   // Not merchant-editable; the preview overrides progress so a merchant always
   // opens a fresh puzzle.
   rememberProgress?: boolean | null;
@@ -102,6 +111,18 @@ export function mountPuzzle(
     konfetiEfekti: true,
     hediyeAdimiAktif: config.giftStep ?? false,
     hediyeKutuModu: config.giftBoxMode ?? false,
+    // The reference takes the gift cards as a list of components to render,
+    // because on ikas a merchant drops them into a slot. Ours come from the
+    // puzzle's own config, so the list is built here instead.
+    hediyeKartlari: (config.gifts ?? []).map((gift) => ({
+      component: PuzzleHediyeKarti,
+      props: {
+        hediyeBasligi: gift.title,
+        hediyeAciklamasi: gift.description ?? undefined,
+        rozetMetni: gift.badgeLabel ?? undefined,
+        hediyeGorseli: gift.imageUrl ?? null,
+      },
+    })),
     kuponKodunuGoster: true,
     kuponKodu: "",
     karistirmaHakki: config.shuffleLimit ?? 0,

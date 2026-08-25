@@ -27,6 +27,33 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   return { config, isNew };
 }
 
+/**
+ * Reads the gift list the form submitted.
+ *
+ * Anything unparseable becomes an empty list rather than throwing: a malformed
+ * field should not cost the merchant the rest of their edits, and the list is
+ * replaced wholesale on save anyway.
+ */
+function parseGifts(raw: FormDataEntryValue | null) {
+  if (typeof raw !== "string" || !raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter(
+        (gift) => gift && typeof gift.title === "string" && gift.title.trim(),
+      )
+      .map((gift) => ({
+        title: String(gift.title).trim(),
+        description: String(gift.description ?? "").trim() || null,
+        badgeLabel: String(gift.badgeLabel ?? "").trim() || null,
+        imageUrl: String(gift.imageUrl ?? "").trim() || null,
+      }));
+  } catch {
+    return [];
+  }
+}
+
 export async function action({ request, params }: ActionFunctionArgs) {
   const { session, admin } = await authenticate.admin(request);
   const form = await request.formData();
@@ -54,6 +81,9 @@ export async function action({ request, params }: ActionFunctionArgs) {
     shuffleLimit: Number(form.get("shuffleLimit") || 0),
     giftBoxMode: form.get("giftBoxMode") === "true",
     giftStep: form.get("giftStep") === "true",
+    // Submitted as one JSON field: the list has no fixed length, and encoding
+    // an ordered list of objects into flat form keys buys nothing here.
+    gifts: parseGifts(form.get("gifts")),
     // Reward and triggering are deliberately absent: they get their own
     // section, and omitting them here leaves whatever a puzzle already has
     // rather than resetting it on every save.
@@ -86,6 +116,21 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
 }
 
+/** A gift as the form holds it: every field a string, none of them required. */
+type GiftDraft = {
+  title: string;
+  description: string;
+  badgeLabel: string;
+  imageUrl: string;
+};
+
+const EMPTY_GIFT: GiftDraft = {
+  title: "",
+  description: "",
+  badgeLabel: "",
+  imageUrl: "",
+};
+
 export default function PuzzleEdit() {
   const { config, isNew } = useLoaderData<typeof loader>();
   const saveFetcher = useFetcher<typeof action>();
@@ -112,6 +157,14 @@ export default function PuzzleEdit() {
       shuffleLimit: String(config?.shuffleLimit ?? 0),
       giftBoxMode: String(config?.giftBoxMode ?? false),
       giftStep: String(config?.giftStep ?? false),
+      gifts: JSON.stringify(
+        (config?.gifts ?? []).map((gift) => ({
+          title: gift.title,
+          description: gift.description ?? "",
+          badgeLabel: gift.badgeLabel ?? "",
+          imageUrl: gift.imageUrl ?? "",
+        })),
+      ),
       isActive: String(config?.isActive ?? false),
     }),
     [config],
@@ -125,6 +178,17 @@ export default function PuzzleEdit() {
   const editImageRef = useRef<HTMLElementTagNameMap["s-button"]>(null);
   const removeImageRef = useRef<HTMLElementTagNameMap["s-button"]>(null);
 
+  // Parsed on the way out and re-serialised on the way in, so the gift editors
+  // work with objects while the form still holds one string per field.
+  const gifts = useMemo<GiftDraft[]>(() => {
+    try {
+      const parsed = JSON.parse(form.gifts);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }, [form.gifts]);
+
   const isDirty = useMemo(
     () => JSON.stringify(form) !== JSON.stringify(baseline),
     [form, baseline],
@@ -136,6 +200,16 @@ export default function PuzzleEdit() {
 
   function setField<K extends keyof typeof form>(key: K, value: string) {
     setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function setGifts(next: GiftDraft[]) {
+    setField("gifts", JSON.stringify(next));
+  }
+
+  function updateGift(index: number, patch: Partial<GiftDraft>) {
+    setGifts(
+      gifts.map((gift, i) => (i === index ? { ...gift, ...patch } : gift)),
+    );
   }
 
   useEffect(() => {
@@ -491,6 +565,73 @@ export default function PuzzleEdit() {
                   }
                 />
               </s-section>
+
+              {form.giftStep === "true" ? (
+                <s-section heading="Gifts">
+                  <s-paragraph>
+                    Shoppers pick one of these when they finish the puzzle.
+                  </s-paragraph>
+
+                  {gifts.length === 0 ? (
+                    <s-banner tone="warning">
+                      The gift step is on but there are no gifts, so shoppers
+                      will be shown an empty choice.
+                    </s-banner>
+                  ) : null}
+
+                  {gifts.map((gift, index) => (
+                    <s-box
+                      key={index}
+                      padding="base"
+                      border="base"
+                      borderRadius="base"
+                    >
+                      <s-stack gap="base">
+                        <s-text-field
+                          label="Gift name"
+                          value={gift.title}
+                          onChange={(event) =>
+                            updateGift(index, {
+                              title: event.currentTarget.value,
+                            })
+                          }
+                        />
+                        <s-text-field
+                          label="Description"
+                          value={gift.description}
+                          onChange={(event) =>
+                            updateGift(index, {
+                              description: event.currentTarget.value,
+                            })
+                          }
+                        />
+                        <s-text-field
+                          label="Badge"
+                          details="Small label on the card. Leave empty to hide."
+                          value={gift.badgeLabel}
+                          onChange={(event) =>
+                            updateGift(index, {
+                              badgeLabel: event.currentTarget.value,
+                            })
+                          }
+                        />
+                        <s-button
+                          tone="critical"
+                          onClick={() =>
+                            setGifts(gifts.filter((_, i) => i !== index))
+                          }
+                        >
+                          Remove gift
+                        </s-button>
+                      </s-stack>
+                    </s-box>
+                  ))}
+
+                  <s-button onClick={() => setGifts([...gifts, EMPTY_GIFT])}>
+                    Add gift
+                  </s-button>
+                </s-section>
+              ) : null}
             </s-stack>
           </s-grid-item>
 

@@ -78,7 +78,25 @@ model PuzzleConfig {
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
+  gifts               PuzzleGift[]
+
   @@index([shopDomain])
+}
+
+/// One of the gifts a shopper picks between once the puzzle is solved.
+model PuzzleGift {
+  id             String       @id @default(cuid())
+  puzzleConfigId String
+  puzzleConfig   PuzzleConfig @relation(fields: [puzzleConfigId], references: [id], onDelete: Cascade)
+  title          String
+  description    String?
+  badgeLabel     String?
+  imageUrl       String?
+  /// Display order, so the merchant's arrangement survives a reload.
+  position       Int          @default(0)
+  createdAt      DateTime     @default(now())
+
+  @@index([puzzleConfigId])
 }
 
 // Daily funnel counters, one row per shop/puzzle/day.

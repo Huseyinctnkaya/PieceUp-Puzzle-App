@@ -109,3 +109,57 @@ test("shows the reward code in the puzzle's own panel", async ({ page }) => {
 
   await expect(page.locator("body")).toContainText("PIECEUP-TEST");
 });
+
+/**
+ * With the gift step on, finishing the puzzle offers the gifts the merchant
+ * defined, and the reward panel only appears once one is picked. This covers
+ * the whole chain — our config shape, the list the renderer builds from it, and
+ * the reference's own selection flow.
+ */
+test("offers the merchant's gifts, then the reward", async ({ page }) => {
+  await page.goto(fixtureUrl);
+
+  // Seeded as finished, the same way a returning shopper's saved progress
+  // would be, rather than dragging every piece to reach the state under test.
+  await page.evaluate((imageUrl) => {
+    window.localStorage.setItem(
+      `ikas-puzzle:${imageUrl}:2x2`,
+      JSON.stringify({ tur: 0, yerlesenler: [0, 1, 2, 3], hamle: 4, tamamlandi: true }),
+    );
+  }, IMAGE);
+
+  await page.evaluate((imageUrl) => {
+    const w = window as unknown as {
+      __mountPreview: (settings: Record<string, unknown>) => Promise<unknown>;
+    };
+    return w.__mountPreview({
+      imageUrl,
+      pieceCount: 4,
+      headline: "Preview",
+      shuffleKey: imageUrl,
+      rememberProgress: true,
+      giftStep: true,
+      // Surprise boxes: the gifts cover the board and the reward waits behind
+      // the choice. Without box mode the strip sits under the board and the
+      // reward is shown straight away, which is a different flow.
+      giftBoxMode: true,
+      gifts: [
+        { title: "Free shipping" },
+        { title: "10% off", description: "On your next order" },
+      ],
+    });
+  }, IMAGE);
+
+  const cards = page.locator(".hediye-karti");
+  await expect(cards).toHaveCount(2);
+
+  // Boxed, so what is inside stays hidden until one is opened.
+  await expect(page.locator(".hediye-serit")).not.toContainText("Free shipping");
+  await expect(page.locator(".odul-serit")).toHaveCount(0);
+
+  await cards.first().click();
+
+  // Opening a box is the choice: the gift is revealed and the reward follows.
+  await expect(page.locator(".hediye-serit")).toContainText("Free shipping");
+  await expect(page.locator(".odul-serit")).toHaveCount(1);
+});

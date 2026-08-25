@@ -1,5 +1,12 @@
 import db from "../db.server";
 
+export type PuzzleGiftInput = {
+  title: string;
+  description: string | null;
+  badgeLabel: string | null;
+  imageUrl: string | null;
+};
+
 export type PuzzleConfigInput = {
   name: string;
   // Optional: the popup renders fine with none of them, and leaving a key out
@@ -17,6 +24,12 @@ export type PuzzleConfigInput = {
   shuffleLimit?: number;
   giftStep?: boolean;
   giftBoxMode?: boolean;
+  /**
+   * The gifts a shopper picks between. Optional so a caller that isn't editing
+   * them leaves them alone; passing an array replaces the lot, which is how the
+   * form submits a list that may have had rows added, removed and reordered.
+   */
+  gifts?: PuzzleGiftInput[];
   // Optional because the puzzle form no longer edits them — discounts and
   // triggering get their own section. Leaving a key out of an update means
   // "don't touch it", so an existing puzzle keeps what it was given.
@@ -75,8 +88,16 @@ export async function listPuzzleConfigs(shopDomain: string) {
   });
 }
 
+/** Gifts always travel with their puzzle: nothing reads one without the other. */
+const withGifts = {
+  gifts: { orderBy: { position: "asc" } },
+} as const;
+
 export async function getPuzzleConfigById(shopDomain: string, id: string) {
-  return db.puzzleConfig.findFirst({ where: { id, shopDomain } });
+  return db.puzzleConfig.findFirst({
+    where: { id, shopDomain },
+    include: withGifts,
+  });
 }
 
 export async function createPuzzleConfig(
@@ -95,7 +116,19 @@ export async function createPuzzleConfig(
   if (input.isActive) {
     await assertCanActivate(shopDomain);
   }
-  return db.puzzleConfig.create({ data: { shopDomain, ...input } });
+  const { gifts, ...fields } = input;
+  return db.puzzleConfig.create({
+    data: {
+      shopDomain,
+      ...fields,
+      ...(gifts ? { gifts: { create: gifts.map(withPosition) } } : {}),
+    },
+  });
+}
+
+/** Positions come from array order — the merchant's arrangement is the list. */
+function withPosition(gift: PuzzleGiftInput, index: number) {
+  return { ...gift, position: index };
 }
 
 export async function updatePuzzleConfig(
@@ -116,7 +149,22 @@ export async function updatePuzzleConfig(
   if (input.isActive) {
     await assertCanActivate(shopDomain, id);
   }
-  return db.puzzleConfig.update({ where: { id }, data: { ...input } });
+  const { gifts, ...fields } = input;
+  if (!gifts) {
+    return db.puzzleConfig.update({ where: { id }, data: fields });
+  }
+
+  // Replaced wholesale rather than diffed: the form submits the list as it
+  // stands, and matching rows up would mean tracking ids through a UI where a
+  // gift's identity is only ever its place in the list. Done in a transaction so
+  // a failure can't leave a puzzle with its gifts deleted and none written.
+  return db.$transaction(async (tx) => {
+    await tx.puzzleGift.deleteMany({ where: { puzzleConfigId: id } });
+    return tx.puzzleConfig.update({
+      where: { id },
+      data: { ...fields, gifts: { create: gifts.map(withPosition) } },
+    });
+  });
 }
 
 export async function deletePuzzleConfig(shopDomain: string, id: string) {
@@ -133,6 +181,7 @@ export async function deletePuzzleConfig(shopDomain: string, id: string) {
 export async function getActivePuzzleConfig(shopDomain: string) {
   const config = await db.puzzleConfig.findFirst({
     where: { shopDomain, isActive: true },
+    include: withGifts,
   });
   if (!config) return null;
   const now = new Date();
