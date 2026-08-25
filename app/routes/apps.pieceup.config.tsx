@@ -34,6 +34,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
           description: gift.description,
           badgeLabel: gift.badgeLabel,
           imageUrl: gift.imageUrl,
+          // Whether this one is worth anything. The storefront cannot tell a
+          // "try again" from a prize otherwise, and congratulates either way.
+          // The discount itself stays here: what a code is worth is the
+          // server's business, and a shopper can read the page's source.
+          awardsPrize: gift.discountType !== "NONE",
         })),
         triggerMode: config.triggerMode,
         triggerPage: config.triggerPage,

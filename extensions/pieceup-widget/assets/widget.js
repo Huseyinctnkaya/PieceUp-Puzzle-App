@@ -164,31 +164,38 @@ function buildPopup(root, config, alreadyPlayed, identityKey) {
     // unstyled. Usually already resolved by the time anyone clicks.
     if (root.stylesReady) await root.stylesReady;
 
-    const puzzle = mountPuzzle(content, config, async (giftIndex) => {
-      try {
-        const code = await submitCompletion(identityKey, giftIndex);
-        // Handed to the puzzle's own reward panel rather than replacing the
-        // whole popup: the reference shows the code in place, over the
-        // finished picture, and that is the moment worth keeping.
-        // Null is a "try again" prize rather than a failure: there is no
-        // code to show, and the puzzle's panel says so on its own.
-        if (code) puzzle.setRewardCode(code);
-      } catch (err) {
-        // The shop hit its plan's monthly reward allowance. That's not the
-        // shopper's fault and retrying won't help, so don't tell them to.
-        if (err && err.message === "reward_limit_reached") {
+    const puzzle = mountPuzzle(
+      content,
+      // Compact inside a popup for the same reason as in the admin preview:
+      // the section's 72px above and below sets the campaign apart from a
+      // page, and a popup has no page — only 144px the puzzle cannot use.
+      { ...config, compact: true },
+      async (giftIndex) => {
+        try {
+          const code = await submitCompletion(identityKey, giftIndex);
+          // Handed to the puzzle's own reward panel rather than replacing the
+          // whole popup: the reference shows the code in place, over the
+          // finished picture, and that is the moment worth keeping.
+          // Null is a "try again" prize rather than a failure: there is no
+          // code to show, and the puzzle's panel says so on its own.
+          if (code) puzzle.setRewardCode(code);
+        } catch (err) {
+          // The shop hit its plan's monthly reward allowance. That's not the
+          // shopper's fault and retrying won't help, so don't tell them to.
+          if (err && err.message === "reward_limit_reached") {
+            renderMessage(
+              content,
+              "This campaign is out of rewards for now. Check back later!",
+            );
+            return;
+          }
           renderMessage(
             content,
-            "This campaign is out of rewards for now. Check back later!",
+            "Couldn't create your reward, please try again.",
           );
-          return;
         }
-        renderMessage(
-          content,
-          "Couldn't create your reward, please try again.",
-        );
-      }
-    });
+      },
+    );
   }
 
   // Click on the backdrop (not the popup box itself) dismisses the popup.

@@ -16,6 +16,8 @@ export type PieceUpGift = {
   description?: string | null;
   badgeLabel?: string | null;
   imageUrl?: string | null;
+  /** False for a "try again": there is nothing to congratulate or shop with. */
+  awardsPrize?: boolean;
 };
 
 export type PieceUpConfig = {
@@ -43,6 +45,13 @@ export type PieceUpConfig = {
    * and it is 144px the puzzle could be using instead.
    */
   compact?: boolean | null;
+  /** Reward panel copy. Defaults read as a Turkish storefront, like the rest. */
+  rewardHeading?: string | null;
+  rewardBody?: string | null;
+  noPrizeHeading?: string | null;
+  noPrizeBody?: string | null;
+  shopButtonLabel?: string | null;
+  shopUrl?: string | null;
   accentColor?: string | null;
   shuffleKey?: string | null;
 };
@@ -94,6 +103,14 @@ export function mountPuzzle(
   // The code does not exist until the puzzle is finished and the server has
   // issued one, so the panel mounts without it and is redrawn when it arrives.
   let rewardCode = "";
+  // Which prize was landed on. Null until the shopper picks, or 0 when there
+  // is no gift step and finishing is itself the win.
+  let wonIndex: number | null = null;
+
+  const gifts = config.gifts ?? [];
+  /** Whether what was won is worth anything — a "try again" is not. */
+  const wonSomething = () =>
+    wonIndex === null || (gifts[wonIndex]?.awardsPrize ?? true);
 
   const props: Props & {
     onTamamlandi?: () => void;
@@ -139,14 +156,45 @@ export function mountPuzzle(
     // With a gift step the prize is not known until one is chosen, so
     // completing the puzzle is not yet the moment to award anything.
     onTamamlandi: () => {
-      if (!config.giftStep) void onComplete(0);
+      if (config.giftStep) return;
+      wonIndex = 0;
+      void onComplete(0);
     },
-    onHediyeSecildi: (giftIndex: number) => void onComplete(giftIndex),
+    onHediyeSecildi: (giftIndex: number) => {
+      wonIndex = giftIndex;
+      // Redrawn straight away so the panel greets the shopper by what they
+      // actually landed on, rather than congratulating everyone and correcting
+      // itself when the code arrives.
+      draw();
+      void onComplete(giftIndex);
+    },
   };
 
   function draw() {
+    const won = wonSomething();
     render(
-      ((<PuzzleKampanya {...props} kuponKodu={rewardCode} />) as unknown) as ComponentChild,
+      (
+        <PuzzleKampanya
+          {...props}
+          kuponKodu={rewardCode}
+          kuponKodunuGoster={won}
+          odulBasligi={
+            won
+              ? (config.rewardHeading ?? "Tebrikler, kazandın!")
+              : (config.noPrizeHeading ?? "Bu sefer olmadı")
+          }
+          odulAciklamasi={
+            won
+              ? (config.rewardBody ??
+                "Aşağıdaki kodu sepetinde kullanarak indirimini alabilirsin.")
+              : (config.noPrizeBody ?? "Bir dahaki sefere bol şans!")
+          }
+          odulButonMetni={
+            won ? (config.shopButtonLabel ?? "Alışverişe başla") : undefined
+          }
+          odulBaglantisi={{ href: config.shopUrl ?? "/collections/all" }}
+        />
+      ) as unknown as ComponentChild,
       container,
     );
   }
