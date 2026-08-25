@@ -8,6 +8,18 @@ import {
 import { mountPuzzle } from "./pieceup-app.js";
 
 export async function initPieceUp(root) {
+  try {
+    await start(root);
+  } catch (error) {
+    // Anything thrown up to here leaves the storefront with no button and no
+    // popup — the widget looks absent rather than broken, which has cost real
+    // time to diagnose more than once. The console is the only place that can
+    // say which of the two it is.
+    console.error("[PieceUp] the puzzle could not start:", error);
+  }
+}
+
+async function start(root) {
   const config = await fetchConfig();
   if (!config) return;
   if (
@@ -17,11 +29,10 @@ export async function initPieceUp(root) {
     return;
 
   const identityKey = getIdentityKey(root);
-  const alreadyPlayed = await fetchStatus(identityKey);
   const popup = buildPopup(
     createHost(root),
     config,
-    alreadyPlayed,
+    await hasPlayed(identityKey),
     identityKey,
   );
 
@@ -30,6 +41,24 @@ export async function initPieceUp(root) {
   }
   if (config.triggerMode === "BUTTON" || config.triggerMode === "BOTH") {
     popup.mountTriggerButton();
+  }
+}
+
+/**
+ * Whether this shopper has already had their go.
+ *
+ * A failed check counts as "not yet". It only decides whether to show the
+ * puzzle or a thank-you message; the server checks again when the puzzle is
+ * completed and refuses a second reward there, so being wrong here costs a
+ * shopper a message rather than a merchant a discount — and a widget that
+ * vanishes because one request failed is the worse outcome by far.
+ */
+async function hasPlayed(identityKey) {
+  try {
+    return await fetchStatus(identityKey);
+  } catch (error) {
+    console.warn("[PieceUp] could not check play status:", error);
+    return false;
   }
 }
 

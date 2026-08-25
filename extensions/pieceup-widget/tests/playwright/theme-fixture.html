@@ -1,0 +1,14 @@
+<!doctype html>
+<html>
+  <body>
+    <!-- A copy of blocks/puzzle-embed.liquid with the Liquid filters resolved,
+         so the path a real theme takes is the one under test. -->
+    <div id="pieceup-root" data-trigger-page="ALL"></div>
+    <script type="module">
+      import { initPieceUp } from "../../assets/widget.js";
+      document.addEventListener("DOMContentLoaded", () => {
+        initPieceUp(document.getElementById("pieceup-root"));
+      });
+    </script>
+  </body>
+</html>

@@ -169,4 +169,32 @@ describe("initPieceUp", () => {
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
     expect(overlay.hidden).toBe(true);
   });
+
+  it("still shows the puzzle when the play check fails", async () => {
+    vi.mocked(api.fetchStatus).mockRejectedValue(new Error("network"));
+    const root = document.getElementById("pieceup-root");
+    await initPieceUp(root);
+
+    // The check only decides which message to show; the server refuses a
+    // second reward on its own. A widget that disappears because one request
+    // failed is much the worse outcome.
+    expect(ui(root).querySelector(".pieceup-trigger")).not.toBeNull();
+  });
+
+  it("says so in the console when it cannot start at all", async () => {
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.mocked(api.fetchConfig).mockRejectedValue(new Error("config_down"));
+    const root = document.getElementById("pieceup-root");
+
+    await initPieceUp(root);
+
+    // Without this the storefront shows nothing and explains nothing, which
+    // is indistinguishable from the app not being installed.
+    expect(logged).toHaveBeenCalledWith(
+      expect.stringContaining("PieceUp"),
+      expect.any(Error),
+    );
+    logged.mockRestore();
+  });
+
 });
