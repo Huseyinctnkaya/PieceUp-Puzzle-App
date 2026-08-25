@@ -14,6 +14,7 @@ import {
 import { getSubscription } from "../services/billing.server";
 import type { action as uploadAction } from "./app.upload";
 import { PuzzlePreview } from "../components/PuzzlePreview";
+import { reorder } from "../lib/reorder";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { session } = await authenticate.admin(request);
@@ -226,6 +227,10 @@ export default function PuzzleEdit() {
   );
 
   const [form, setForm] = useState(initialForm);
+  /** Which prize the editor is open on, by index; null when it is closed. */
+  const [editing, setEditing] = useState<number | null>(null);
+  /** The row being dragged, so the list can show it lifting. */
+  const [dragging, setDragging] = useState<number | null>(null);
   // The baseline is what's currently persisted. It advances on a successful
   // save so the save bar goes away, without needing the loader to re-run.
   const [baseline, setBaseline] = useState(initialForm);
@@ -246,6 +251,10 @@ export default function PuzzleEdit() {
       return [];
     }
   }, [form.gifts]);
+
+  // The row the editor is showing. Falls back to a blank prize so the modal can
+  // be in the DOM before any prize exists — commandFor needs a target to find.
+  const openGift = gifts[editing ?? 0] ?? EMPTY_GIFT;
 
   const isDirty = useMemo(
     () => JSON.stringify(form) !== JSON.stringify(baseline),
@@ -270,13 +279,9 @@ export default function PuzzleEdit() {
     );
   }
 
-  /** Moves a gift up or down the list; the order is what shoppers see. */
-  function moveGift(index: number, direction: -1 | 1) {
-    const target = index + direction;
-    if (target < 0 || target >= gifts.length) return;
-    const next = [...gifts];
-    [next[index], next[target]] = [next[target], next[index]];
-    setGifts(next);
+  /** The order is what shoppers are shown, so it is the merchant's to set. */
+  function moveGift(from: number, to: number) {
+    setGifts(reorder(gifts, from, to));
   }
 
   /** Opens Shopify's own picker, so the merchant searches their real catalog. */
@@ -652,163 +657,88 @@ export default function PuzzleEdit() {
                 />
               </s-section>
 
-              {form.giftStep === "true" ? (
-                <s-section heading="Gifts">
-                  <s-paragraph>
-                    Shoppers pick one of these when they finish the puzzle.
-                  </s-paragraph>
+              <s-section heading="Discounts">
+                <s-paragraph>
+                  What a shopper can win. Each one becomes a real Shopify
+                  discount code when it is won, so it shows up under Discounts
+                  and reports like any other.
+                </s-paragraph>
 
-                  {gifts.length === 0 ? (
-                    <s-banner tone="warning">
-                      The gift step is on but there are no gifts, so shoppers
-                      will be shown an empty choice.
-                    </s-banner>
-                  ) : null}
+                {gifts.length === 0 ? (
+                  <s-banner tone="warning">
+                    No prizes yet, so finishing the puzzle awards nothing. Add
+                    at least one.
+                  </s-banner>
+                ) : null}
 
-                  {gifts.map((gift, index) => (
-                    <s-box
-                      key={index}
-                      padding="base"
-                      border="base"
-                      borderRadius="base"
-                    >
-                      <s-stack gap="base">
-                        <s-stack
-                          direction="inline"
-                          gap="small"
-                          alignItems="center"
-                        >
-                          <s-stack gap="none">
-                            <s-text type="strong">
-                              {gift.title || "Untitled gift"}
-                            </s-text>
-                            <s-text color="subdued">
-                              {describeGift(gift)}
-                            </s-text>
-                          </s-stack>
-                          {/* Buttons rather than drag handles: dragging needs a
-                              pointer, and this list is short enough that two
-                              taps beat a drag anyone can miss. */}
-                          <s-button
-                            icon="chevron-up"
-                            accessibilityLabel="Move up"
-                            disabled={index === 0}
-                            onClick={() => moveGift(index, -1)}
-                          />
-                          <s-button
-                            icon="chevron-down"
-                            accessibilityLabel="Move down"
-                            disabled={index === gifts.length - 1}
-                            onClick={() => moveGift(index, 1)}
-                          />
-                          <s-button
-                            icon="delete"
-                            tone="critical"
-                            accessibilityLabel="Remove gift"
-                            onClick={() =>
-                              setGifts(gifts.filter((_, i) => i !== index))
-                            }
-                          />
+                {gifts.map((gift, index) => (
+                  <div
+                    key={index}
+                    draggable
+                    onDragStart={() => setDragging(index)}
+                    onDragOver={(event) => {
+                      // Without this the drop never fires: the default is to
+                      // refuse, and preventing it is what marks a valid target.
+                      event.preventDefault();
+                      if (dragging !== null && dragging !== index) {
+                        moveGift(dragging, index);
+                        setDragging(index);
+                      }
+                    }}
+                    onDragEnd={() => setDragging(null)}
+                    style={{
+                      cursor: "grab",
+                      opacity: dragging === index ? 0.5 : 1,
+                    }}
+                  >
+                    <s-box padding="base" border="base" borderRadius="base">
+                      <s-stack
+                        direction="inline"
+                        gap="base"
+                        alignItems="center"
+                      >
+                        <s-icon type="drag-handle" tone="neutral" />
+                        <s-stack gap="none">
+                          <s-text type="strong">
+                            {gift.title || "Untitled prize"}
+                          </s-text>
+                          <s-text color="subdued">{describeGift(gift)}</s-text>
                         </s-stack>
-
-                        <s-text-field
-                          label="Gift name"
-                          value={gift.title}
-                          onChange={(event) =>
-                            updateGift(index, {
-                              title: event.currentTarget.value,
-                            })
-                          }
-                        />
-
-                        <s-text-field
-                          label="Description"
-                          value={gift.description}
-                          onChange={(event) =>
-                            updateGift(index, {
-                              description: event.currentTarget.value,
-                            })
-                          }
-                        />
-
-                        <s-text-field
-                          label="Badge"
-                          details="Small label on the card. Leave empty to hide."
-                          value={gift.badgeLabel}
-                          onChange={(event) =>
-                            updateGift(index, {
-                              badgeLabel: event.currentTarget.value,
-                            })
-                          }
-                        />
-
-                        <s-select
-                          label="Discount"
-                          value={gift.discountType}
-                          onChange={(event) =>
-                            updateGift(index, {
-                              discountType: event.currentTarget.value,
-                            })
-                          }
+                        <s-button
+                          commandFor="prize-editor"
+                          command="--show"
+                          onClick={() => setEditing(index)}
                         >
-                          {DISCOUNT_TYPES.map((type) => (
-                            <s-option key={type.value} value={type.value}>
-                              {type.label}
-                            </s-option>
-                          ))}
-                        </s-select>
-
-                        {needsValue(gift.discountType) ? (
-                          <s-number-field
-                            label={
-                              gift.discountType.startsWith("PERCENTAGE")
-                                ? "Percentage off"
-                                : "Amount off"
-                            }
-                            min={0}
-                            value={gift.discountValue}
-                            onChange={(event) =>
-                              updateGift(index, {
-                                discountValue: event.currentTarget.value,
-                              })
-                            }
-                          />
-                        ) : null}
-
-                        {limitsToProducts(gift.discountType) ? (
-                          <s-stack gap="small">
-                            <s-text color="subdued">
-                              {gift.productIds.length +
-                                gift.collectionIds.length ===
-                              0
-                                ? "Nothing selected — the discount would apply to the whole order."
-                                : `${gift.productIds.length} products, ${gift.collectionIds.length} collections`}
-                            </s-text>
-                            <s-stack direction="inline" gap="small">
-                              <s-button
-                                onClick={() => pickResources(index, "product")}
-                              >
-                                Choose products
-                              </s-button>
-                              <s-button
-                                onClick={() =>
-                                  pickResources(index, "collection")
-                                }
-                              >
-                                Choose collections
-                              </s-button>
-                            </s-stack>
-                          </s-stack>
-                        ) : null}
+                          Edit
+                        </s-button>
+                        <s-button
+                          icon="delete"
+                          tone="critical"
+                          accessibilityLabel="Remove prize"
+                          onClick={() =>
+                            setGifts(gifts.filter((_, i) => i !== index))
+                          }
+                        />
                       </s-stack>
                     </s-box>
-                  ))}
+                  </div>
+                ))}
 
-                  <s-button onClick={() => setGifts([...gifts, EMPTY_GIFT])}>
-                    Add gift
-                  </s-button>
-                </s-section>
-              ) : null}
+                <s-button
+                  icon="plus"
+                  commandFor="prize-editor"
+                  command="--show"
+                  onClick={() => {
+                    setGifts([...gifts, EMPTY_GIFT]);
+                    // Opens straight onto the new row: adding a prize and
+                    // naming it are one action as far as the merchant is
+                    // concerned.
+                    setEditing(gifts.length);
+                  }}
+                >
+                  Add prize
+                </s-button>
+              </s-section>
             </s-stack>
           </s-grid-item>
 
@@ -850,6 +780,115 @@ export default function PuzzleEdit() {
           </s-grid-item>
         </s-grid>
       </s-stack>
+      {/* One editor reused for whichever prize is open, rather than a modal
+          per row: the list can be any length, and only ever one is edited. */}
+      {/* Always rendered, because commandFor resolves its target at click time
+          and the first "Add prize" click happens before React has re-rendered
+          with the new row. */}
+      {
+        <s-modal
+          id="prize-editor"
+          heading={openGift.title || "New prize"}
+          onHide={() => setEditing(null)}
+        >
+          <s-stack gap="base">
+            <s-text-field
+              label="Name"
+              details="What the shopper sees on the card."
+              value={openGift.title}
+              onChange={(event) =>
+                updateGift(editing ?? 0, { title: event.currentTarget.value })
+              }
+            />
+
+            <s-text-field
+              label="Description"
+              value={openGift.description}
+              onChange={(event) =>
+                updateGift(editing ?? 0, {
+                  description: event.currentTarget.value,
+                })
+              }
+            />
+
+            <s-text-field
+              label="Badge"
+              details="Small label on the card. Leave empty to hide."
+              value={openGift.badgeLabel}
+              onChange={(event) =>
+                updateGift(editing ?? 0, {
+                  badgeLabel: event.currentTarget.value,
+                })
+              }
+            />
+
+            <s-select
+              label="Discount type"
+              value={openGift.discountType}
+              onChange={(event) =>
+                updateGift(editing ?? 0, {
+                  discountType: event.currentTarget.value,
+                })
+              }
+            >
+              {DISCOUNT_TYPES.map((type) => (
+                <s-option key={type.value} value={type.value}>
+                  {type.label}
+                </s-option>
+              ))}
+            </s-select>
+
+            {needsValue(openGift.discountType) ? (
+              <s-number-field
+                label={
+                  openGift.discountType.startsWith("PERCENTAGE")
+                    ? "Percentage off"
+                    : "Amount off"
+                }
+                min={0}
+                value={openGift.discountValue}
+                onChange={(event) =>
+                  updateGift(editing ?? 0, {
+                    discountValue: event.currentTarget.value,
+                  })
+                }
+              />
+            ) : null}
+
+            {limitsToProducts(openGift.discountType) ? (
+              <s-stack gap="small">
+                <s-text color="subdued">
+                  {openGift.productIds.length +
+                    openGift.collectionIds.length ===
+                  0
+                    ? "Nothing selected — the discount would apply to the whole order."
+                    : `${openGift.productIds.length} products, ${openGift.collectionIds.length} collections`}
+                </s-text>
+                <s-stack direction="inline" gap="small">
+                  <s-button
+                    onClick={() => pickResources(editing ?? 0, "product")}
+                  >
+                    Choose products
+                  </s-button>
+                  <s-button
+                    onClick={() => pickResources(editing ?? 0, "collection")}
+                  >
+                    Choose collections
+                  </s-button>
+                </s-stack>
+              </s-stack>
+            ) : null}
+          </s-stack>
+
+          <s-button
+            slot="primary-action"
+            variant="primary"
+            onClick={() => setEditing(null)}
+          >
+            Done
+          </s-button>
+        </s-modal>
+      }
     </s-page>
   );
 }
