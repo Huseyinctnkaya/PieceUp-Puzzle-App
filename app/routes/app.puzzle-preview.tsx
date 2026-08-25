@@ -18,8 +18,8 @@ function gridFor(pieceCount: number) {
 
 /** Cell size for the admin panel — smaller than the storefront's, same shapes. */
 const CELL = 72;
-/** Matches the storefront's default knob size (24 on a 0..100 scale). */
-const TAB_RATIO = 0.24;
+/** Knob size is a percentage of the cell, and the storefront caps it at 40%. */
+const MAX_KNOB = 0.4;
 
 export async function loader({ request }: LoaderFunctionArgs) {
   await authenticate.admin(request);
@@ -27,9 +27,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const url = new URL(request.url);
   const pieceCount = Number(url.searchParams.get("pieceCount") || 9);
   const imageUrl = url.searchParams.get("seed") || "";
+  const knobSize = Number(url.searchParams.get("knobSize") || 24);
 
   const { rows, cols } = gridFor(pieceCount);
-  const tab = CELL * TAB_RATIO;
+  // Clamped exactly as the storefront clamps it, so the preview cannot show a
+  // knob the shopper would never be given.
+  const tab = CELL * Math.max(0, Math.min(MAX_KNOB, knobSize / 100));
   // Seeded exactly as the storefront does, so the merchant previews the same
   // puzzle their shoppers will be given — same edges, same scatter.
   const seed = `${imageUrl}:${rows}x${cols}`;

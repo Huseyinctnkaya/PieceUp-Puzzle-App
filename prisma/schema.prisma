@@ -44,6 +44,22 @@ model PuzzleConfig {
   description         String?
   imageUrl            String?
   pieceCount          Int       @default(9)
+
+  // Gameplay, named to match the props the storefront puzzle takes.
+  knobSize            Int       @default(24)
+  difficulty          String    @default("easy")
+  trayPosition        String    @default("right")
+  accentColor         String    @default("#1a1a1a")
+  showGuide           Boolean   @default(true)
+  wrongPieceBehaviour String    @default("return")
+  // Null means no limit rather than "no time": zero seconds would be a puzzle
+  // nobody can finish.
+  timeLimitSeconds    Int?
+  // Zero means unlimited, which is how the puzzle already reads it.
+  shuffleLimit        Int       @default(0)
+  showMoves           Boolean   @default(true)
+  rememberProgress    Boolean   @default(true)
+  confetti            Boolean   @default(true)
   rewardType          String    @default("PERCENTAGE_DISCOUNT")
   rewardValue         String    @default("10")
   triggerMode         String    @default("BUTTON")

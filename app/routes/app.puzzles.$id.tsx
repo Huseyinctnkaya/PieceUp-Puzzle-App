@@ -41,6 +41,23 @@ export async function action({ request, params }: ActionFunctionArgs) {
     description: String(form.get("description") || "").trim() || null,
     imageUrl: String(form.get("imageUrl") || ""),
     pieceCount: Number(form.get("pieceCount") || 9),
+    knobSize: Number(form.get("knobSize") || 24),
+    difficulty: String(form.get("difficulty") || "easy") as
+      "easy" | "medium" | "hard",
+    trayPosition: String(form.get("trayPosition") || "right") as
+      "right" | "left" | "bottom",
+    accentColor: String(form.get("accentColor") || "#1a1a1a"),
+    showGuide: form.get("showGuide") === "true",
+    wrongPieceBehaviour: String(form.get("wrongPieceBehaviour") || "return") as
+      "return" | "stay",
+    // Empty means no limit, which is not the same as a limit of zero.
+    timeLimitSeconds: form.get("timeLimitSeconds")
+      ? Number(form.get("timeLimitSeconds"))
+      : null,
+    shuffleLimit: Number(form.get("shuffleLimit") || 0),
+    showMoves: form.get("showMoves") === "true",
+    rememberProgress: form.get("rememberProgress") === "true",
+    confetti: form.get("confetti") === "true",
     rewardType: String(form.get("rewardType") || "PERCENTAGE_DISCOUNT") as
       "PERCENTAGE_DISCOUNT" | "FREE_PRODUCT_DISCOUNT",
     rewardValue: String(form.get("rewardValue") || "10"),
@@ -95,6 +112,18 @@ export default function PuzzleEdit() {
       description: config?.description ?? "",
       imageUrl: config?.imageUrl ?? "",
       pieceCount: String(config?.pieceCount ?? 9),
+      knobSize: String(config?.knobSize ?? 24),
+      difficulty: config?.difficulty ?? "easy",
+      trayPosition: config?.trayPosition ?? "right",
+      accentColor: config?.accentColor ?? "#1a1a1a",
+      showGuide: String(config?.showGuide ?? true),
+      wrongPieceBehaviour: config?.wrongPieceBehaviour ?? "return",
+      timeLimitSeconds:
+        config?.timeLimitSeconds == null ? "" : String(config.timeLimitSeconds),
+      shuffleLimit: String(config?.shuffleLimit ?? 0),
+      showMoves: String(config?.showMoves ?? true),
+      rememberProgress: String(config?.rememberProgress ?? true),
+      confetti: String(config?.confetti ?? true),
       rewardType: config?.rewardType ?? "PERCENTAGE_DISCOUNT",
       rewardValue: config?.rewardValue ?? "10",
       triggerMode: config?.triggerMode ?? "BUTTON",
@@ -431,6 +460,127 @@ export default function PuzzleEdit() {
                 <s-option value="ONCE_PER_DAY">Once per day</s-option>
               </s-select>
             </s-section>
+
+            <s-section heading="Gameplay">
+              <s-select
+                label="Difficulty"
+                details="How close a piece has to land before it snaps in."
+                value={form.difficulty}
+                onChange={(event) =>
+                  setField("difficulty", event.currentTarget.value)
+                }
+              >
+                <s-option value="easy">Easy</s-option>
+                <s-option value="medium">Medium</s-option>
+                <s-option value="hard">Hard</s-option>
+              </s-select>
+
+              <s-number-field
+                label="Knob size"
+                details="0 gives plain square pieces, higher gives a more pronounced jigsaw edge."
+                min={0}
+                max={40}
+                step={1}
+                value={form.knobSize}
+                onChange={(event) =>
+                  setField("knobSize", event.currentTarget.value)
+                }
+              />
+
+              <s-select
+                label="Tray position"
+                details="Where the loose pieces sit. Always below the board on mobile."
+                value={form.trayPosition}
+                onChange={(event) =>
+                  setField("trayPosition", event.currentTarget.value)
+                }
+              >
+                <s-option value="right">Right of the board</s-option>
+                <s-option value="left">Left of the board</s-option>
+                <s-option value="bottom">Below the board</s-option>
+              </s-select>
+
+              <s-select
+                label="Wrong piece"
+                details="What happens when a shopper drops a piece somewhere it doesn't belong."
+                value={form.wrongPieceBehaviour}
+                onChange={(event) =>
+                  setField("wrongPieceBehaviour", event.currentTarget.value)
+                }
+              >
+                <s-option value="return">Goes back to the tray</s-option>
+                <s-option value="stay">Stays where it was dropped</s-option>
+              </s-select>
+
+              <s-number-field
+                label="Time limit (seconds)"
+                details="Leave empty for no time limit."
+                min={10}
+                step={5}
+                value={form.timeLimitSeconds}
+                onChange={(event) =>
+                  setField("timeLimitSeconds", event.currentTarget.value)
+                }
+              />
+
+              <s-number-field
+                label="Shuffles allowed"
+                details="0 means the shopper can reshuffle as often as they like."
+                min={0}
+                max={20}
+                step={1}
+                value={form.shuffleLimit}
+                onChange={(event) =>
+                  setField("shuffleLimit", event.currentTarget.value)
+                }
+              />
+
+              <s-color-field
+                label="Accent colour"
+                details="Used for buttons and highlights inside the puzzle."
+                value={form.accentColor}
+                onChange={(event) =>
+                  setField("accentColor", event.currentTarget.value)
+                }
+              />
+
+              <s-checkbox
+                label="Show a faded guide image on the board"
+                details="Turn off to make the puzzle harder."
+                checked={form.showGuide === "true"}
+                onChange={(event) =>
+                  setField("showGuide", String(event.currentTarget.checked))
+                }
+              />
+
+              <s-checkbox
+                label="Show the move counter"
+                checked={form.showMoves === "true"}
+                onChange={(event) =>
+                  setField("showMoves", String(event.currentTarget.checked))
+                }
+              />
+
+              <s-checkbox
+                label="Remember progress"
+                details="Shoppers pick up where they left off after a refresh."
+                checked={form.rememberProgress === "true"}
+                onChange={(event) =>
+                  setField(
+                    "rememberProgress",
+                    String(event.currentTarget.checked),
+                  )
+                }
+              />
+
+              <s-checkbox
+                label="Celebrate with confetti"
+                checked={form.confetti === "true"}
+                onChange={(event) =>
+                  setField("confetti", String(event.currentTarget.checked))
+                }
+              />
+            </s-section>
           </s-grid-item>
 
           <s-grid-item>
@@ -443,11 +593,12 @@ export default function PuzzleEdit() {
                 <s-stack gap="base">
                   <s-text color="subdued">
                     This is how the puzzle will look in your store. The preview
-                    updates as you change the image or piece count.
+                    updates as you change the image, piece count or knob size.
                   </s-text>
                   <PuzzlePreview
                     imageUrl={form.imageUrl}
                     pieceCount={Number(form.pieceCount)}
+                    knobSize={Number(form.knobSize)}
                   />
                 </s-stack>
               </s-section>

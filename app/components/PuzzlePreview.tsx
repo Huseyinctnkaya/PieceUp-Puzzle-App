@@ -10,9 +10,12 @@ import type { loader as previewLoader } from "../routes/app.puzzle-preview";
 export function PuzzlePreview({
   imageUrl,
   pieceCount,
+  knobSize,
 }: {
   imageUrl: string;
   pieceCount: number;
+  /** 0..40, the same scale the storefront setting uses. */
+  knobSize: number;
 }) {
   const geometry = useFetcher<typeof previewLoader>();
   const { load } = geometry;
@@ -21,10 +24,11 @@ export function PuzzlePreview({
     if (!imageUrl) return;
     const params = new URLSearchParams({
       pieceCount: String(pieceCount),
+      knobSize: String(knobSize),
       seed: imageUrl,
     });
     load(`/app/puzzle-preview?${params}`);
-  }, [imageUrl, pieceCount, load]);
+  }, [imageUrl, pieceCount, knobSize, load]);
 
   if (!imageUrl) {
     return (

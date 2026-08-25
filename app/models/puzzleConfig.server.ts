@@ -9,6 +9,17 @@ export type PuzzleConfigInput = {
   description?: string | null;
   imageUrl: string;
   pieceCount: number;
+  knobSize?: number;
+  difficulty?: "easy" | "medium" | "hard";
+  trayPosition?: "right" | "left" | "bottom";
+  accentColor?: string;
+  showGuide?: boolean;
+  wrongPieceBehaviour?: "return" | "stay";
+  timeLimitSeconds?: number | null;
+  shuffleLimit?: number;
+  showMoves?: boolean;
+  rememberProgress?: boolean;
+  confetti?: boolean;
   rewardType: "PERCENTAGE_DISCOUNT" | "FREE_PRODUCT_DISCOUNT";
   rewardValue: string;
   triggerMode: "BUTTON" | "AUTO" | "BOTH";

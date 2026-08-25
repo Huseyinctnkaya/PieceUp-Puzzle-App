@@ -247,3 +247,78 @@ test("shows the trigger fixed in the corner of the viewport", async ({
   expect(placement.fromRight).toBe(20);
   expect(placement.fromBottom).toBe(20);
 });
+
+/**
+ * The merchant's gameplay settings have to survive the whole trip: the app
+ * proxy's JSON, the mapping in entry.tsx, and the puzzle's own props. Asserting
+ * on what actually renders is the only way to catch a name that stops matching
+ * somewhere in the middle.
+ */
+test("puts the tray where the merchant asked and hides the guide", async ({
+  page,
+}) => {
+  await openPuzzle(page, {
+    trayPosition: "left",
+    showGuide: false,
+    showMoves: false,
+  });
+  await page.click(".ortu .ana-buton");
+
+  const layout = await page.evaluate(() => {
+    const shadow = document.getElementById("pieceup-root")!.shadowRoot!;
+    const board = shadow.querySelector(".tahta")!.getBoundingClientRect();
+    const tray = shadow.querySelector(".tepsi")!.getBoundingClientRect();
+    return {
+      trayIsLeftOfBoard: tray.right <= board.left + 1,
+      guides: shadow.querySelectorAll(".rehber").length,
+      counters: shadow.querySelectorAll(".sayac").length,
+    };
+  });
+
+  expect(layout.trayIsLeftOfBoard).toBe(true);
+  expect(layout.guides).toBe(0);
+  expect(layout.counters).toBe(0);
+});
+
+test("applies the difficulty the merchant chose", async ({ page }) => {
+  // Hard tolerance is a fraction of a cell, so a piece dropped well short of
+  // its slot must be rejected where an easy puzzle would have accepted it.
+  await openPuzzle(page, { difficulty: "hard", pieceCount: 4 });
+  await page.click(".ortu .ana-buton");
+
+  const board = await page.locator(".tahta").boundingBox();
+  const piece = page.locator(".parca").last();
+  const before = await piece.boundingBox();
+  if (!board || !before) throw new Error("missing geometry");
+
+  const grabX = before.x + before.width / 2;
+  const grabY = before.y + before.height / 2;
+  await page.mouse.move(grabX, grabY);
+  await page.mouse.down();
+  await page.mouse.move(grabX + 40, grabY + 40, { steps: 6 });
+  await page.waitForTimeout(150);
+
+  const lifted = await piece.boundingBox();
+  if (!lifted) throw new Error("missing lifted piece");
+  const label = (await piece.getAttribute("aria-label")) ?? "";
+  const index = Number((label.match(/\d+/) ?? ["1"])[0]) - 1;
+  const cellWidth = board.width / 2;
+  const cellHeight = board.height / 2;
+  // Tolerance is a fraction of the *shorter* cell side: 0.5 on easy, 0.22 on
+  // hard. Aiming 0.35 of it off therefore lands on easy and misses on hard,
+  // which is what makes this an assertion about the setting rather than about
+  // dropping a piece badly.
+  const targetX =
+    board.x + ((index % 2) + 0.5) * cellWidth + cellHeight * 0.35;
+  const targetY = board.y + (Math.floor(index / 2) + 0.5) * cellHeight;
+
+  await page.mouse.move(
+    grabX + 40 + (targetX - (lifted.x + lifted.width / 2)),
+    grabY + 40 + (targetY - (lifted.y + lifted.height / 2)),
+    { steps: 8 },
+  );
+  await page.mouse.up();
+  await page.waitForTimeout(300);
+
+  await expect(page.locator(".ilerleme-yazisi")).toHaveText("0 / 4");
+});
