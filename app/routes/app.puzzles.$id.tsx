@@ -78,6 +78,10 @@ export async function action({ request, params }: ActionFunctionArgs) {
     if (error instanceof PuzzleLimitReachedError) {
       return { error: "puzzle_limit_reached", limit: error.limit };
     }
+    // Anything reaching here is a bug, not a rule the merchant broke, and the
+    // banner they see cannot say more than "try again". Logging it is the only
+    // way the cause is ever visible — a swallowed one cost an afternoon.
+    console.error("Failed to save puzzle", params.id, error);
     return { error: "save_failed" };
   }
 }
