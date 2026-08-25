@@ -11,7 +11,8 @@ const WIDE_IMAGE = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMgAAABkCAIAAA
 
 type ConfigOverrides = Record<string, unknown>;
 
-async function openPuzzle(page: Page, overrides: ConfigOverrides = {}) {
+/** Loads the widget with a given config, without opening the popup. */
+async function setUpPuzzle(page: Page, overrides: ConfigOverrides = {}) {
   await page.route("**/apps/pieceup/config", (route) =>
     route.fulfill({
       json: {
@@ -43,6 +44,11 @@ async function openPuzzle(page: Page, overrides: ConfigOverrides = {}) {
     };
     return w.__initPieceUp(document.getElementById("pieceup-root"));
   });
+}
+
+/** Loads the widget and opens the popup from its trigger button. */
+async function openPuzzle(page: Page, overrides: ConfigOverrides = {}) {
+  await setUpPuzzle(page, overrides);
   await page.click(".pieceup-trigger");
 }
 
@@ -309,4 +315,37 @@ test("applies the difficulty the merchant chose", async ({ page }) => {
   await page.waitForTimeout(300);
 
   await expect(page.locator(".ilerleme-yazisi")).toHaveText("0 / 4");
+});
+
+/**
+ * How the puzzle opens is the merchant's choice, and each mode has to be
+ * distinguishable from the others — a mode that quietly behaves like "button"
+ * is the setting doing nothing.
+ */
+test("opens on its own when the merchant asked it to", async ({ page }) => {
+  await setUpPuzzle(page, { triggerMode: "AUTO", triggerDelaySeconds: 0 });
+
+  // No click: that is the whole point of the mode.
+  await expect(page.locator(".ortu .ana-buton")).toBeVisible();
+  // And no trigger button to press, since the merchant did not ask for one.
+  await expect(page.locator(".pieceup-trigger")).toHaveCount(0);
+});
+
+test("offers both a button and an automatic open when asked for both", async ({
+  page,
+}) => {
+  await setUpPuzzle(page, { triggerMode: "BOTH", triggerDelaySeconds: 0 });
+
+  await expect(page.locator(".pieceup-trigger")).toHaveCount(1);
+  await expect(page.locator(".ortu .ana-buton")).toBeVisible();
+});
+
+test("waits the delay the merchant set before opening", async ({ page }) => {
+  await setUpPuzzle(page, { triggerMode: "AUTO", triggerDelaySeconds: 2 });
+
+  // Still shut a moment in: a delay that opens immediately is not a delay.
+  await page.waitForTimeout(300);
+  await expect(page.locator(".pieceup-overlay")).toBeHidden();
+
+  await expect(page.locator(".ortu .ana-buton")).toBeVisible({ timeout: 4000 });
 });

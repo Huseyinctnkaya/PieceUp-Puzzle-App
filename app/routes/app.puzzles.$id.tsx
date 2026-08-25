@@ -69,6 +69,14 @@ export async function action({ request, params }: ActionFunctionArgs) {
     shuffleLimit: Number(form.get("shuffleLimit") || 0),
     giftBoxMode: form.get("giftBoxMode") === "true",
     giftStep: form.get("giftStep") === "true",
+    triggerMode: String(form.get("triggerMode") || "BUTTON") as
+      "BUTTON" | "AUTO" | "BOTH",
+    // Only meaningful when the puzzle opens on its own; null the rest of the
+    // time so a stale delay cannot outlive the mode that used it.
+    triggerDelaySeconds:
+      form.get("triggerMode") === "BUTTON"
+        ? null
+        : Number(form.get("triggerDelaySeconds") || 0),
     // Submitted as one JSON field: the list has no fixed length, and encoding
     // an ordered list of objects into flat form keys buys nothing here.
     gifts: parseGifts(form.get("gifts")),
@@ -153,6 +161,8 @@ export default function PuzzleEdit() {
       shuffleLimit: String(config?.shuffleLimit ?? 0),
       giftBoxMode: String(config?.giftBoxMode ?? false),
       giftStep: String(config?.giftStep ?? false),
+      triggerMode: config?.triggerMode ?? "BUTTON",
+      triggerDelaySeconds: String(config?.triggerDelaySeconds ?? 3),
       gifts: JSON.stringify(toDrafts(config?.gifts ?? [])),
       isActive: String(config?.isActive ?? false),
     }),
@@ -491,6 +501,34 @@ export default function PuzzleEdit() {
               </s-section>
 
               <s-section heading="Settings">
+                <s-select
+                  label="How it opens"
+                  details="How shoppers get to the puzzle in your store."
+                  value={form.triggerMode}
+                  onChange={(event) =>
+                    setField("triggerMode", event.currentTarget.value)
+                  }
+                >
+                  <s-option value="BUTTON">
+                    Button in the bottom corner
+                  </s-option>
+                  <s-option value="AUTO">Opens on its own</s-option>
+                  <s-option value="BOTH">Both</s-option>
+                </s-select>
+
+                {form.triggerMode !== "BUTTON" ? (
+                  <s-number-field
+                    label="Open after (seconds)"
+                    details="Counted from the moment the page loads. 0 opens it straight away."
+                    min={0}
+                    max={120}
+                    value={form.triggerDelaySeconds}
+                    onChange={(event) =>
+                      setField("triggerDelaySeconds", event.currentTarget.value)
+                    }
+                  />
+                ) : null}
+
                 <s-select
                   label="Pieces"
                   value={form.pieceCount}
