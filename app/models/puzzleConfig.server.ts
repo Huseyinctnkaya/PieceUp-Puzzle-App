@@ -13,19 +13,19 @@ export type PuzzleConfigInput = {
   difficulty?: "easy" | "medium" | "hard";
   trayPosition?: "right" | "left" | "bottom";
   accentColor?: string;
-  showGuide?: boolean;
-  wrongPieceBehaviour?: "return" | "stay";
   timeLimitSeconds?: number | null;
   shuffleLimit?: number;
-  showMoves?: boolean;
-  rememberProgress?: boolean;
-  confetti?: boolean;
-  rewardType: "PERCENTAGE_DISCOUNT" | "FREE_PRODUCT_DISCOUNT";
-  rewardValue: string;
-  triggerMode: "BUTTON" | "AUTO" | "BOTH";
-  triggerPage: "CART" | "PRODUCT" | "ALL";
-  triggerDelaySeconds: number | null;
-  playLimitType: "ONCE_EVER" | "ONCE_PER_DAY";
+  giftStep?: boolean;
+  giftBoxMode?: boolean;
+  // Optional because the puzzle form no longer edits them — discounts and
+  // triggering get their own section. Leaving a key out of an update means
+  // "don't touch it", so an existing puzzle keeps what it was given.
+  rewardType?: "PERCENTAGE_DISCOUNT" | "FREE_PRODUCT_DISCOUNT";
+  rewardValue?: string;
+  triggerMode?: "BUTTON" | "AUTO" | "BOTH";
+  triggerPage?: "CART" | "PRODUCT" | "ALL";
+  triggerDelaySeconds?: number | null;
+  playLimitType?: "ONCE_EVER" | "ONCE_PER_DAY";
   isActive: boolean;
   startDate: Date | null;
   endDate: Date | null;

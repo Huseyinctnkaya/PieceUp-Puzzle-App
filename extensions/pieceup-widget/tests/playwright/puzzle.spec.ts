@@ -254,30 +254,18 @@ test("shows the trigger fixed in the corner of the viewport", async ({
  * on what actually renders is the only way to catch a name that stops matching
  * somewhere in the middle.
  */
-test("puts the tray where the merchant asked and hides the guide", async ({
-  page,
-}) => {
-  await openPuzzle(page, {
-    trayPosition: "left",
-    showGuide: false,
-    showMoves: false,
-  });
+test("puts the tray where the merchant asked", async ({ page }) => {
+  await openPuzzle(page, { trayPosition: "left" });
   await page.click(".ortu .ana-buton");
 
-  const layout = await page.evaluate(() => {
+  const trayIsLeftOfBoard = await page.evaluate(() => {
     const shadow = document.getElementById("pieceup-root")!.shadowRoot!;
     const board = shadow.querySelector(".tahta")!.getBoundingClientRect();
     const tray = shadow.querySelector(".tepsi")!.getBoundingClientRect();
-    return {
-      trayIsLeftOfBoard: tray.right <= board.left + 1,
-      guides: shadow.querySelectorAll(".rehber").length,
-      counters: shadow.querySelectorAll(".sayac").length,
-    };
+    return tray.right <= board.left + 1;
   });
 
-  expect(layout.trayIsLeftOfBoard).toBe(true);
-  expect(layout.guides).toBe(0);
-  expect(layout.counters).toBe(0);
+  expect(trayIsLeftOfBoard).toBe(true);
 });
 
 test("applies the difficulty the merchant chose", async ({ page }) => {

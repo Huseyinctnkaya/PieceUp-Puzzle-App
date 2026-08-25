@@ -50,13 +50,19 @@ model PuzzleConfig {
   difficulty          String    @default("easy")
   trayPosition        String    @default("right")
   accentColor         String    @default("#1a1a1a")
-  showGuide           Boolean   @default(true)
-  wrongPieceBehaviour String    @default("return")
   // Null means no limit rather than "no time": zero seconds would be a puzzle
   // nobody can finish.
   timeLimitSeconds    Int?
   // Zero means unlimited, which is how the puzzle already reads it.
   shuffleLimit        Int       @default(0)
+  giftStep            Boolean   @default(false)
+  giftBoxMode         Boolean   @default(false)
+
+  // Not editable: the merchant's settings are the ones the reference exposes,
+  // and these keep the puzzle's own defaults. Kept as columns rather than
+  // dropped so they are here if they are ever worth exposing.
+  showGuide           Boolean   @default(true)
+  wrongPieceBehaviour String    @default("return")
   showMoves           Boolean   @default(true)
   rememberProgress    Boolean   @default(true)
   confetti            Boolean   @default(true)

@@ -21,13 +21,13 @@ export type PieceUpConfig = {
   knobSize?: number | null;
   difficulty?: "easy" | "medium" | "hard" | null;
   trayPosition?: "right" | "left" | "bottom" | null;
-  showGuide?: boolean | null;
-  wrongPieceBehaviour?: "return" | "stay" | null;
   timeLimitSeconds?: number | null;
-  showMoves?: boolean | null;
-  rememberProgress?: boolean | null;
   shuffleLimit?: number | null;
-  confetti?: boolean | null;
+  giftStep?: boolean | null;
+  giftBoxMode?: boolean | null;
+  // Not merchant-editable; the preview overrides progress so a merchant always
+  // opens a fresh puzzle.
+  rememberProgress?: boolean | null;
   accentColor?: string | null;
   shuffleKey?: string | null;
 };
@@ -77,17 +77,17 @@ export function mountPuzzle(
     tirtikBoyutu: range(config.knobSize ?? 24),
     zorlukSeviyesi: DIFFICULTY[config.difficulty ?? "easy"] ?? "kolay",
     tepsiKonumu: TRAY[config.trayPosition ?? "right"] ?? "sag",
-    rehberGorseliGoster: config.showGuide ?? true,
-    yanlisParcaDavranisi:
-      config.wrongPieceBehaviour === "stay" ? "kal" : "geriDon",
+    rehberGorseliGoster: true,
+    yanlisParcaDavranisi: "geriDon",
     karistirmaAnahtari: config.shuffleKey ?? config.imageUrl ?? "pieceup",
     sureLimitiAktif: Boolean(config.timeLimitSeconds),
     sureSaniye: config.timeLimitSeconds ?? 120,
-    hamleSayaciniGoster: config.showMoves ?? true,
+    hamleSayaciniGoster: true,
     ilerlemeyiHatirla: config.rememberProgress ?? true,
     tekrarOynanabilir: false,
-    konfetiEfekti: config.confetti ?? true,
-    hediyeAdimiAktif: false,
+    konfetiEfekti: true,
+    hediyeAdimiAktif: config.giftStep ?? false,
+    hediyeKutuModu: config.giftBoxMode ?? false,
     kuponKodunuGoster: Boolean(rewardCode),
     kuponKodu: rewardCode ?? "",
     karistirmaHakki: config.shuffleLimit ?? 0,

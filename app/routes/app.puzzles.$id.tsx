@@ -47,29 +47,16 @@ export async function action({ request, params }: ActionFunctionArgs) {
     trayPosition: String(form.get("trayPosition") || "right") as
       "right" | "left" | "bottom",
     accentColor: String(form.get("accentColor") || "#1a1a1a"),
-    showGuide: form.get("showGuide") === "true",
-    wrongPieceBehaviour: String(form.get("wrongPieceBehaviour") || "return") as
-      "return" | "stay",
     // Empty means no limit, which is not the same as a limit of zero.
     timeLimitSeconds: form.get("timeLimitSeconds")
       ? Number(form.get("timeLimitSeconds"))
       : null,
     shuffleLimit: Number(form.get("shuffleLimit") || 0),
-    showMoves: form.get("showMoves") === "true",
-    rememberProgress: form.get("rememberProgress") === "true",
-    confetti: form.get("confetti") === "true",
-    rewardType: String(form.get("rewardType") || "PERCENTAGE_DISCOUNT") as
-      "PERCENTAGE_DISCOUNT" | "FREE_PRODUCT_DISCOUNT",
-    rewardValue: String(form.get("rewardValue") || "10"),
-    triggerMode: String(form.get("triggerMode") || "BUTTON") as
-      "BUTTON" | "AUTO" | "BOTH",
-    triggerPage: String(form.get("triggerPage") || "ALL") as
-      "CART" | "PRODUCT" | "ALL",
-    triggerDelaySeconds: form.get("triggerDelaySeconds")
-      ? Number(form.get("triggerDelaySeconds"))
-      : null,
-    playLimitType: String(form.get("playLimitType") || "ONCE_EVER") as
-      "ONCE_EVER" | "ONCE_PER_DAY",
+    giftBoxMode: form.get("giftBoxMode") === "true",
+    giftStep: form.get("giftStep") === "true",
+    // Reward and triggering are deliberately absent: they get their own
+    // section, and omitting them here leaves whatever a puzzle already has
+    // rather than resetting it on every save.
     isActive: form.get("isActive") === "true",
     startDate: null,
     endDate: null,
@@ -116,19 +103,11 @@ export default function PuzzleEdit() {
       difficulty: config?.difficulty ?? "easy",
       trayPosition: config?.trayPosition ?? "right",
       accentColor: config?.accentColor ?? "#1a1a1a",
-      showGuide: String(config?.showGuide ?? true),
-      wrongPieceBehaviour: config?.wrongPieceBehaviour ?? "return",
       timeLimitSeconds:
         config?.timeLimitSeconds == null ? "" : String(config.timeLimitSeconds),
       shuffleLimit: String(config?.shuffleLimit ?? 0),
-      showMoves: String(config?.showMoves ?? true),
-      rememberProgress: String(config?.rememberProgress ?? true),
-      confetti: String(config?.confetti ?? true),
-      rewardType: config?.rewardType ?? "PERCENTAGE_DISCOUNT",
-      rewardValue: config?.rewardValue ?? "10",
-      triggerMode: config?.triggerMode ?? "BUTTON",
-      triggerPage: config?.triggerPage ?? "ALL",
-      playLimitType: config?.playLimitType ?? "ONCE_EVER",
+      giftBoxMode: String(config?.giftBoxMode ?? false),
+      giftStep: String(config?.giftStep ?? false),
       isActive: String(config?.isActive ?? false),
     }),
     [config],
@@ -296,291 +275,219 @@ export default function PuzzleEdit() {
 
         <s-grid gridTemplateColumns="1fr 1fr" gap="base">
           <s-grid-item>
-            <s-section heading="Puzzle details">
-              <s-text-field
-                label="Puzzle name"
-                details="Only you see this — it names the puzzle in your list."
-                value={form.name}
-                onChange={(event) =>
-                  setField("name", event.currentTarget.value)
-                }
-              />
+            {/* Stacked with a gap: sibling sections otherwise sit flush
+                against each other and read as one panel. */}
+            <s-stack gap="base">
+              <s-section heading="Puzzle details">
+                <s-text-field
+                  label="Puzzle name"
+                  details="Only you see this — it names the puzzle in your list."
+                  value={form.name}
+                  onChange={(event) =>
+                    setField("name", event.currentTarget.value)
+                  }
+                />
 
-              <s-text-field
-                label="Badge"
-                details="Small label above the headline. Leave empty to hide."
-                placeholder="Win a reward"
-                value={form.badgeLabel}
-                onChange={(event) =>
-                  setField("badgeLabel", event.currentTarget.value)
-                }
-              />
+                <s-text-field
+                  label="Badge"
+                  details="Small label above the headline. Leave empty to hide."
+                  placeholder="Win a reward"
+                  value={form.badgeLabel}
+                  onChange={(event) =>
+                    setField("badgeLabel", event.currentTarget.value)
+                  }
+                />
 
-              <s-text-field
-                label="Headline"
-                details="Shown to shoppers above the puzzle."
-                placeholder="Solve the puzzle, claim your discount"
-                value={form.headline}
-                onChange={(event) =>
-                  setField("headline", event.currentTarget.value)
-                }
-              />
+                <s-text-field
+                  label="Headline"
+                  details="Shown to shoppers above the puzzle."
+                  placeholder="Solve the puzzle, claim your discount"
+                  value={form.headline}
+                  onChange={(event) =>
+                    setField("headline", event.currentTarget.value)
+                  }
+                />
 
-              <s-text-area
-                label="Description"
-                details="One or two lines under the headline."
-                rows={2}
-                value={form.description}
-                onChange={(event) =>
-                  setField("description", event.currentTarget.value)
-                }
-              />
+                <s-text-area
+                  label="Description"
+                  details="One or two lines under the headline."
+                  rows={2}
+                  value={form.description}
+                  onChange={(event) =>
+                    setField("description", event.currentTarget.value)
+                  }
+                />
 
-              {/* Hidden input backing the "Replace" button — the drop zone's
+                {/* Hidden input backing the "Replace" button — the drop zone's
                   own picker can't be opened programmatically. */}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                style={{ display: "none" }}
-                onChange={(event) => {
-                  uploadFile(event.target.files?.[0]);
-                  // Reset so picking the same file twice still fires onChange.
-                  event.target.value = "";
-                }}
-              />
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  style={{ display: "none" }}
+                  onChange={(event) => {
+                    uploadFile(event.target.files?.[0]);
+                    // Reset so picking the same file twice still fires onChange.
+                    event.target.value = "";
+                  }}
+                />
 
-              <s-drop-zone
-                label="Puzzle image"
-                accept="image/jpeg,image/png,image/webp"
-                error={uploadError}
-                onChange={handleDrop}
-              >
-                {form.imageUrl ? (
-                  <s-stack gap="small-200" alignItems="center">
-                    <s-thumbnail
-                      src={form.imageUrl}
-                      alt="Puzzle image"
-                      size="large"
-                    />
-                    {/* These two get native click listeners (see the effect
+                <s-drop-zone
+                  label="Puzzle image"
+                  accept="image/jpeg,image/png,image/webp"
+                  error={uploadError}
+                  onChange={handleDrop}
+                >
+                  {form.imageUrl ? (
+                    <s-stack gap="small-200" alignItems="center">
+                      <s-thumbnail
+                        src={form.imageUrl}
+                        alt="Puzzle image"
+                        size="large"
+                      />
+                      {/* These two get native click listeners (see the effect
                         above) instead of React's onClick. React 18 delegates
                         all clicks to the app root, so a React handler here
                         fires *after* s-drop-zone's own native listener has
                         already opened its file picker — stopPropagation from
                         a React handler is too late to prevent it. */}
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <s-button
-                        ref={editImageRef}
-                        loading={uploadFetcher.state !== "idle"}
-                      >
-                        Replace
-                      </s-button>
-                      <s-button ref={removeImageRef} tone="critical">
-                        Remove
-                      </s-button>
-                    </div>
-                  </s-stack>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <s-button
+                          ref={editImageRef}
+                          loading={uploadFetcher.state !== "idle"}
+                        >
+                          Replace
+                        </s-button>
+                        <s-button ref={removeImageRef} tone="critical">
+                          Remove
+                        </s-button>
+                      </div>
+                    </s-stack>
+                  ) : null}
+                </s-drop-zone>
+              </s-section>
+
+              <s-section heading="Settings">
+                <s-select
+                  label="Pieces"
+                  value={form.pieceCount}
+                  onChange={(event) =>
+                    setField("pieceCount", event.currentTarget.value)
+                  }
+                >
+                  <s-option value="4">2 × 2</s-option>
+                  <s-option value="6">3 × 2</s-option>
+                  <s-option value="9">3 × 3</s-option>
+                  <s-option value="12">4 × 3</s-option>
+                  <s-option value="16">4 × 4</s-option>
+                </s-select>
+
+                <s-number-field
+                  label="Knob size"
+                  details="0 gives plain square pieces, higher gives a more pronounced jigsaw edge."
+                  min={0}
+                  max={40}
+                  step={1}
+                  value={form.knobSize}
+                  onChange={(event) =>
+                    setField("knobSize", event.currentTarget.value)
+                  }
+                />
+
+                <s-select
+                  label="Difficulty"
+                  details="How close a piece has to land before it snaps in."
+                  value={form.difficulty}
+                  onChange={(event) =>
+                    setField("difficulty", event.currentTarget.value)
+                  }
+                >
+                  <s-option value="easy">Easy</s-option>
+                  <s-option value="medium">Medium</s-option>
+                  <s-option value="hard">Hard</s-option>
+                </s-select>
+
+                <s-select
+                  label="Tray"
+                  details="Where the loose pieces sit. Always below the board on mobile."
+                  value={form.trayPosition}
+                  onChange={(event) =>
+                    setField("trayPosition", event.currentTarget.value)
+                  }
+                >
+                  <s-option value="right">Right of the board</s-option>
+                  <s-option value="left">Left of the board</s-option>
+                  <s-option value="bottom">Below the board</s-option>
+                </s-select>
+
+                <s-color-field
+                  label="Accent colour"
+                  details="Used for buttons and highlights inside the puzzle."
+                  value={form.accentColor}
+                  onChange={(event) =>
+                    setField("accentColor", event.currentTarget.value)
+                  }
+                />
+
+                <s-select
+                  label="Shuffles allowed"
+                  value={form.shuffleLimit}
+                  onChange={(event) =>
+                    setField("shuffleLimit", event.currentTarget.value)
+                  }
+                >
+                  <s-option value="0">Unlimited</s-option>
+                  <s-option value="1">1</s-option>
+                  <s-option value="2">2</s-option>
+                  <s-option value="3">3</s-option>
+                  <s-option value="5">5</s-option>
+                </s-select>
+
+                <s-checkbox
+                  label="Time limit"
+                  details="Shoppers have to finish within the time you set."
+                  checked={form.timeLimitSeconds !== ""}
+                  onChange={(event) =>
+                    // Cleared rather than zeroed when switched off: no limit and
+                    // a limit of zero seconds are different things.
+                    setField(
+                      "timeLimitSeconds",
+                      event.currentTarget.checked ? "120" : "",
+                    )
+                  }
+                />
+
+                {form.timeLimitSeconds !== "" ? (
+                  <s-number-field
+                    label="Seconds"
+                    min={10}
+                    step={5}
+                    value={form.timeLimitSeconds}
+                    onChange={(event) =>
+                      setField("timeLimitSeconds", event.currentTarget.value)
+                    }
+                  />
                 ) : null}
-              </s-drop-zone>
 
-              <s-select
-                label="Pieces"
-                value={form.pieceCount}
-                onChange={(event) =>
-                  setField("pieceCount", event.currentTarget.value)
-                }
-              >
-                <s-option value="4">4</s-option>
-                <s-option value="6">6</s-option>
-                <s-option value="9">9</s-option>
-                <s-option value="12">12</s-option>
-                <s-option value="16">16</s-option>
-              </s-select>
+                <s-checkbox
+                  label="Gift step"
+                  details="After the puzzle, shoppers pick a gift instead of going straight to the reward."
+                  checked={form.giftStep === "true"}
+                  onChange={(event) =>
+                    setField("giftStep", String(event.currentTarget.checked))
+                  }
+                />
 
-              <s-select
-                label="Reward type"
-                value={form.rewardType}
-                onChange={(event) =>
-                  setField("rewardType", event.currentTarget.value)
-                }
-              >
-                <s-option value="PERCENTAGE_DISCOUNT">
-                  Percentage discount
-                </s-option>
-                <s-option value="FREE_PRODUCT_DISCOUNT">
-                  Free product discount
-                </s-option>
-              </s-select>
-
-              <s-text-field
-                label={
-                  form.rewardType === "PERCENTAGE_DISCOUNT"
-                    ? "Discount percentage"
-                    : "Product ID"
-                }
-                value={form.rewardValue}
-                onChange={(event) =>
-                  setField("rewardValue", event.currentTarget.value)
-                }
-              />
-
-              <s-select
-                label="Trigger"
-                value={form.triggerMode}
-                onChange={(event) =>
-                  setField("triggerMode", event.currentTarget.value)
-                }
-              >
-                <s-option value="BUTTON">Button only</s-option>
-                <s-option value="AUTO">Opens automatically</s-option>
-                <s-option value="BOTH">Both</s-option>
-              </s-select>
-
-              <s-select
-                label="Show on"
-                value={form.triggerPage}
-                onChange={(event) =>
-                  setField("triggerPage", event.currentTarget.value)
-                }
-              >
-                <s-option value="ALL">All pages</s-option>
-                <s-option value="CART">Cart</s-option>
-                <s-option value="PRODUCT">Product</s-option>
-              </s-select>
-
-              <s-select
-                label="Play limit"
-                value={form.playLimitType}
-                onChange={(event) =>
-                  setField("playLimitType", event.currentTarget.value)
-                }
-              >
-                <s-option value="ONCE_EVER">Once per person</s-option>
-                <s-option value="ONCE_PER_DAY">Once per day</s-option>
-              </s-select>
-            </s-section>
-
-            <s-section heading="Gameplay">
-              <s-select
-                label="Difficulty"
-                details="How close a piece has to land before it snaps in."
-                value={form.difficulty}
-                onChange={(event) =>
-                  setField("difficulty", event.currentTarget.value)
-                }
-              >
-                <s-option value="easy">Easy</s-option>
-                <s-option value="medium">Medium</s-option>
-                <s-option value="hard">Hard</s-option>
-              </s-select>
-
-              <s-number-field
-                label="Knob size"
-                details="0 gives plain square pieces, higher gives a more pronounced jigsaw edge."
-                min={0}
-                max={40}
-                step={1}
-                value={form.knobSize}
-                onChange={(event) =>
-                  setField("knobSize", event.currentTarget.value)
-                }
-              />
-
-              <s-select
-                label="Tray position"
-                details="Where the loose pieces sit. Always below the board on mobile."
-                value={form.trayPosition}
-                onChange={(event) =>
-                  setField("trayPosition", event.currentTarget.value)
-                }
-              >
-                <s-option value="right">Right of the board</s-option>
-                <s-option value="left">Left of the board</s-option>
-                <s-option value="bottom">Below the board</s-option>
-              </s-select>
-
-              <s-select
-                label="Wrong piece"
-                details="What happens when a shopper drops a piece somewhere it doesn't belong."
-                value={form.wrongPieceBehaviour}
-                onChange={(event) =>
-                  setField("wrongPieceBehaviour", event.currentTarget.value)
-                }
-              >
-                <s-option value="return">Goes back to the tray</s-option>
-                <s-option value="stay">Stays where it was dropped</s-option>
-              </s-select>
-
-              <s-number-field
-                label="Time limit (seconds)"
-                details="Leave empty for no time limit."
-                min={10}
-                step={5}
-                value={form.timeLimitSeconds}
-                onChange={(event) =>
-                  setField("timeLimitSeconds", event.currentTarget.value)
-                }
-              />
-
-              <s-number-field
-                label="Shuffles allowed"
-                details="0 means the shopper can reshuffle as often as they like."
-                min={0}
-                max={20}
-                step={1}
-                value={form.shuffleLimit}
-                onChange={(event) =>
-                  setField("shuffleLimit", event.currentTarget.value)
-                }
-              />
-
-              <s-color-field
-                label="Accent colour"
-                details="Used for buttons and highlights inside the puzzle."
-                value={form.accentColor}
-                onChange={(event) =>
-                  setField("accentColor", event.currentTarget.value)
-                }
-              />
-
-              <s-checkbox
-                label="Show a faded guide image on the board"
-                details="Turn off to make the puzzle harder."
-                checked={form.showGuide === "true"}
-                onChange={(event) =>
-                  setField("showGuide", String(event.currentTarget.checked))
-                }
-              />
-
-              <s-checkbox
-                label="Show the move counter"
-                checked={form.showMoves === "true"}
-                onChange={(event) =>
-                  setField("showMoves", String(event.currentTarget.checked))
-                }
-              />
-
-              <s-checkbox
-                label="Remember progress"
-                details="Shoppers pick up where they left off after a refresh."
-                checked={form.rememberProgress === "true"}
-                onChange={(event) =>
-                  setField(
-                    "rememberProgress",
-                    String(event.currentTarget.checked),
-                  )
-                }
-              />
-
-              <s-checkbox
-                label="Celebrate with confetti"
-                checked={form.confetti === "true"}
-                onChange={(event) =>
-                  setField("confetti", String(event.currentTarget.checked))
-                }
-              />
-            </s-section>
+                <s-checkbox
+                  label="Surprise boxes"
+                  details="Shows the gifts as closed boxes. Only one can be opened."
+                  checked={form.giftBoxMode === "true"}
+                  onChange={(event) =>
+                    setField("giftBoxMode", String(event.currentTarget.checked))
+                  }
+                />
+              </s-section>
+            </s-stack>
           </s-grid-item>
 
           <s-grid-item>
@@ -593,7 +500,8 @@ export default function PuzzleEdit() {
                 <s-stack gap="base">
                   <s-text color="subdued">
                     This is how the puzzle will look in your store. The preview
-                    opens exactly what a shopper sees, with the settings you have here.
+                    opens exactly what a shopper sees, with the settings you
+                    have here.
                   </s-text>
                   <PuzzlePreview
                     settings={{
@@ -603,15 +511,12 @@ export default function PuzzleEdit() {
                       difficulty: form.difficulty,
                       trayPosition: form.trayPosition,
                       accentColor: form.accentColor,
-                      showGuide: form.showGuide === "true",
-                      wrongPieceBehaviour: form.wrongPieceBehaviour,
                       timeLimitSeconds: form.timeLimitSeconds
                         ? Number(form.timeLimitSeconds)
                         : null,
                       shuffleLimit: Number(form.shuffleLimit),
-                      showMoves: form.showMoves === "true",
-                      rememberProgress: form.rememberProgress === "true",
-                      confetti: form.confetti === "true",
+                      giftStep: form.giftStep === "true",
+                      giftBoxMode: form.giftBoxMode === "true",
                       badgeLabel: form.badgeLabel,
                       headline: form.headline,
                       description: form.description,

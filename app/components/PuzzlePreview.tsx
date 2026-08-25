@@ -8,13 +8,10 @@ export type PreviewSettings = {
   difficulty: string;
   trayPosition: string;
   accentColor: string;
-  showGuide: boolean;
-  wrongPieceBehaviour: string;
   timeLimitSeconds: number | null;
   shuffleLimit: number;
-  showMoves: boolean;
-  rememberProgress: boolean;
-  confetti: boolean;
+  giftStep: boolean;
+  giftBoxMode: boolean;
   badgeLabel: string;
   headline: string;
   description: string;
