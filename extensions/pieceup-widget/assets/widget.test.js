@@ -131,6 +131,41 @@ describe("initPieceUp", () => {
     expect(handle.clearProgress).not.toHaveBeenCalled();
   });
 
+  it("submits only one reward while a completion request is in flight", async () => {
+    let resolveReward;
+    vi.mocked(api.submitCompletion).mockReturnValue(
+      new Promise((resolve) => {
+        resolveReward = resolve;
+      }),
+    );
+    const root = document.getElementById("pieceup-root");
+    await initPieceUp(root);
+    await openPopup(root);
+
+    const complete = completionCallback();
+    const first = complete(0);
+    const second = complete(1);
+
+    expect(api.submitCompletion).toHaveBeenCalledOnce();
+    resolveReward("PIECEUP-TEST");
+    await Promise.all([first, second]);
+  });
+
+  it("allows a reward retry after the previous request failed", async () => {
+    vi.mocked(api.submitCompletion)
+      .mockRejectedValueOnce(new Error("network"))
+      .mockResolvedValueOnce("PIECEUP-TEST");
+    const root = document.getElementById("pieceup-root");
+    await initPieceUp(root);
+    await openPopup(root);
+
+    const complete = completionCallback();
+    await complete(0);
+    await complete(0);
+
+    expect(api.submitCompletion).toHaveBeenCalledTimes(2);
+  });
+
   it("explains a spent reward allowance without telling the shopper to retry", async () => {
     vi.mocked(api.submitCompletion).mockRejectedValue(
       new Error("reward_limit_reached"),

@@ -104,6 +104,22 @@ describe("apps.pieceup.complete action", () => {
     expect(recordCompletion).not.toHaveBeenCalled();
   });
 
+  it("returns an issued code even when recording the play fails", async () => {
+    vi.mocked(recordCompletion).mockRejectedValue(new Error("database locked"));
+
+    const response = await invoke({ identityKey: "device:xyz" });
+
+    // Shopify has already created a real discount at this point. Reporting a
+    // failure makes the shopper retry and creates another orphaned code.
+    expect(response.status).toBe(200);
+    expect((await response.json()).discountCode).toBe("PIECEUP-ABC123");
+    expect(recordStat).toHaveBeenCalledWith(
+      "shop-a.myshopify.com",
+      "puzzle-1",
+      "rewarded",
+    );
+  });
+
   it("refuses to issue a reward once the plan's monthly allowance is spent", async () => {
     vi.mocked(countRewardsThisMonth).mockResolvedValue(100);
     const response = await invoke({ identityKey: "device:xyz" });

@@ -130,10 +130,15 @@ export async function action({ request }: ActionFunctionArgs) {
       config.playLimitType as PlayLimitType,
     );
   } catch (error) {
-    return new Response(JSON.stringify({ error: "already_played" }), {
-      status: 409,
-      headers: { "Content-Type": "application/json" },
-    });
+    // The Shopify mutation above has already created a real, redeemable code.
+    // Turning a local persistence failure into an HTTP error makes the shopper
+    // retry and mints another orphaned discount while hiding the valid one they
+    // just won. Log the bookkeeping failure, but deliver the existing reward.
+    console.error(
+      "Reward issued but completion could not be recorded",
+      session.shop,
+      error,
+    );
   }
 
   // Only a real code counts as rewarded, so the funnel keeps meaning what it

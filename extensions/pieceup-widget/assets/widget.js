@@ -128,6 +128,7 @@ function createHost(root) {
 
 function buildPopup(root, config, alreadyPlayed, identityKey) {
   let puzzle = null;
+  let completionPromise = null;
   // The initial status was fetched when the widget started. Keep it current for
   // later opens on the same page as well: a limited play becomes spent as soon
   // as its reward is issued, while an unlimited campaign may mount a fresh
@@ -187,40 +188,51 @@ function buildPopup(root, config, alreadyPlayed, identityKey) {
       // page, and a popup has no page — only 144px the puzzle cannot use.
       { ...config, compact: true },
       async (giftIndex) => {
-        try {
-          const code = await submitCompletion(identityKey, giftIndex);
-          // Completion is now safely recorded by the server. Forget the saved
-          // finished round, but leave the currently mounted reward panel in
-          // place until the shopper closes it.
-          activePuzzle.clearProgress();
-          playSpent = !config.canReplay;
-          // Handed to the puzzle's own reward panel rather than replacing the
-          // whole popup: the reference shows the code in place, over the
-          // finished picture, and that is the moment worth keeping.
-          // Null is a "try again" prize rather than a failure: there is no
-          // code to show, and the puzzle's panel says so on its own.
-          if (code && puzzle === activePuzzle && !overlay.hidden) {
-            activePuzzle.setRewardCode(code);
-          }
-        } catch (err) {
-          if (puzzle === activePuzzle) {
-            activePuzzle.destroy();
-            puzzle = null;
-          }
-          // The shop hit its plan's monthly reward allowance. That's not the
-          // shopper's fault and retrying won't help, so don't tell them to.
-          if (err && err.message === "reward_limit_reached") {
+        // A gift event can be delivered twice before the first network round
+        // trip finishes (double click, duplicate component event, slow store).
+        // Share the in-flight request so one win can never mint two discounts.
+        if (completionPromise) return completionPromise;
+
+        completionPromise = (async () => {
+          try {
+            const code = await submitCompletion(identityKey, giftIndex);
+            // Completion is now safely recorded by the server. Forget the saved
+            // finished round, but leave the currently mounted reward panel in
+            // place until the shopper closes it.
+            activePuzzle.clearProgress();
+            playSpent = !config.canReplay;
+            // Handed to the puzzle's own reward panel rather than replacing the
+            // whole popup: the reference shows the code in place, over the
+            // finished picture, and that is the moment worth keeping.
+            // Null is a "try again" prize rather than a failure: there is no
+            // code to show, and the puzzle's panel says so on its own.
+            if (code && puzzle === activePuzzle && !overlay.hidden) {
+              activePuzzle.setRewardCode(code);
+            }
+          } catch (err) {
+            if (puzzle === activePuzzle) {
+              activePuzzle.destroy();
+              puzzle = null;
+            }
+            // The shop hit its plan's monthly reward allowance. That's not the
+            // shopper's fault and retrying won't help, so don't tell them to.
+            if (err && err.message === "reward_limit_reached") {
+              renderMessage(
+                content,
+                "This campaign is out of rewards for now. Check back later!",
+              );
+              return;
+            }
             renderMessage(
               content,
-              "This campaign is out of rewards for now. Check back later!",
+              "Couldn't create your reward, please try again.",
             );
-            return;
+          } finally {
+            completionPromise = null;
           }
-          renderMessage(
-            content,
-            "Couldn't create your reward, please try again.",
-          );
-        }
+        })();
+
+        return completionPromise;
       },
     );
     puzzle = activePuzzle;
