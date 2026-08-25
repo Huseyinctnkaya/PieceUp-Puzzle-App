@@ -28,6 +28,12 @@ export type PieceUpConfig = {
   // Not merchant-editable; the preview overrides progress so a merchant always
   // opens a fresh puzzle.
   rememberProgress?: boolean | null;
+  /**
+   * Drops the section's vertical padding. On a storefront that padding sets the
+   * campaign apart from the rest of the page; inside a modal there is no page,
+   * and it is 144px the puzzle could be using instead.
+   */
+  compact?: boolean | null;
   accentColor?: string | null;
   shuffleKey?: string | null;
 };
@@ -100,6 +106,7 @@ export function mountPuzzle(
     kuponKodu: "",
     karistirmaHakki: config.shuffleLimit ?? 0,
     vurguRengi: config.accentColor ?? "#1a1a1a",
+    dikeyBosluk: range(config.compact ? 0 : 72),
     onTamamlandi: () => void onComplete(),
   };
 
