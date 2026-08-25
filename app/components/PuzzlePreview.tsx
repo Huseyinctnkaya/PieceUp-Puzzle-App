@@ -17,6 +17,37 @@ export type PreviewSettings = {
   description: string;
 };
 
+/** Where the widget build publishes the bundle for the admin to load. */
+const BUNDLE_URL = "/pieceup-app.js";
+
+let bundlePromise: Promise<PuzzleModule> | null = null;
+
+/**
+ * Imports the storefront bundle, once per page.
+ *
+ * The indirection through a blob is what keeps the bundler out of it: a bare
+ * `import("/pieceup-app.js")` is a build-time request Vite rejects for anything
+ * under public/, whereas a blob URL is only ever resolved by the browser.
+ */
+function loadPuzzleBundle(): Promise<PuzzleModule> {
+  if (bundlePromise) return bundlePromise;
+
+  const source = `export * from "${new URL(BUNDLE_URL, window.location.origin).href}";`;
+  const blobUrl = URL.createObjectURL(
+    new Blob([source], { type: "text/javascript" }),
+  );
+
+  bundlePromise = (import(/* @vite-ignore */ blobUrl) as Promise<PuzzleModule>)
+    .finally(() => URL.revokeObjectURL(blobUrl))
+    .catch((error) => {
+      // Cleared so a later attempt can retry rather than replaying the failure.
+      bundlePromise = null;
+      throw error;
+    });
+
+  return bundlePromise;
+}
+
 type PuzzleModule = {
   mountPuzzle: (
     container: HTMLElement,
@@ -56,10 +87,13 @@ function usePuzzleMount(settings: PreviewSettings, open: boolean) {
 
     // Loaded on demand: the bundle is only needed when a merchant asks to see
     // the puzzle, and it is not small enough to spend on every page load.
-    // The path is built at runtime so the bundler leaves it alone: this file is
-    // served from public/, not resolved from source.
-    const bundle = "/pieceup-app.js";
-    (import(/* @vite-ignore */ bundle) as Promise<PuzzleModule>)
+    //
+    // Imported through a blob rather than by its path. It is served from
+    // public/, and Vite refuses to resolve a public file from source at all —
+    // even behind @vite-ignore — because such files bypass its transforms. The
+    // blob is a module whose only job is to re-export the real one, so the URL
+    // is opaque to the bundler and resolved by the browser at runtime.
+    loadPuzzleBundle()
       .then((puzzle) => {
         if (cancelled) return;
         mounted = puzzle.mountPuzzle(

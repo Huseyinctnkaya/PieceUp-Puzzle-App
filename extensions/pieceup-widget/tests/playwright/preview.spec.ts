@@ -41,3 +41,71 @@ test("mounts the storefront puzzle from the bundle alone", async ({ page }) => {
   });
   expect(trayIsLeft).toBe(true);
 });
+
+/**
+ * widget.js drives the puzzle through the handle mountPuzzle returns, and the
+ * unit tests mock that module — so nothing there can tell whether the mock
+ * still resembles the real thing. It stopped resembling it: mountPuzzle went
+ * back to returning a bare function while widget.js kept calling
+ * setRewardCode on it, which meant a shopper who finished a puzzle was never
+ * shown their code. This asserts the real module's shape.
+ */
+test("returns the handle widget.js drives it with", async ({ page }) => {
+  await page.goto(fixtureUrl);
+  await page.evaluate((imageUrl) => {
+    const w = window as unknown as {
+      __mountPreview: (settings: Record<string, unknown>) => Promise<unknown>;
+    };
+    return w.__mountPreview({ imageUrl, pieceCount: 4, headline: "Preview" });
+  }, IMAGE);
+
+  const handle = await page.evaluate(() => {
+    const w = window as unknown as {
+      __handle: { setRewardCode?: unknown; destroy?: unknown };
+    };
+    return {
+      setRewardCode: typeof w.__handle.setRewardCode,
+      destroy: typeof w.__handle.destroy,
+    };
+  });
+
+  expect(handle.setRewardCode).toBe("function");
+  expect(handle.destroy).toBe("function");
+});
+
+test("shows the reward code in the puzzle's own panel", async ({ page }) => {
+  await page.goto(fixtureUrl);
+
+  // The reward panel only exists once the puzzle is finished, which is also
+  // the only moment widget.js calls setRewardCode. Seeded through the same
+  // saved progress a returning shopper would have, rather than by dragging
+  // four pieces to get to the state under test.
+  await page.evaluate((imageUrl) => {
+    window.localStorage.setItem(
+      `ikas-puzzle:${imageUrl}:2x2`,
+      JSON.stringify({ tur: 0, yerlesenler: [0, 1, 2, 3], hamle: 4, tamamlandi: true }),
+    );
+  }, IMAGE);
+
+  await page.evaluate((imageUrl) => {
+    const w = window as unknown as {
+      __mountPreview: (settings: Record<string, unknown>) => Promise<unknown>;
+    };
+    return w.__mountPreview({
+      imageUrl,
+      pieceCount: 4,
+      headline: "Preview",
+      shuffleKey: imageUrl,
+      rememberProgress: true,
+    });
+  }, IMAGE);
+
+  await page.evaluate(() => {
+    const w = window as unknown as {
+      __handle: { setRewardCode(code: string): void };
+    };
+    w.__handle.setRewardCode("PIECEUP-TEST");
+  });
+
+  await expect(page.locator("body")).toContainText("PIECEUP-TEST");
+});

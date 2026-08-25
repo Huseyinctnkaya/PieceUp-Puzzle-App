@@ -1,9 +1,9 @@
 <!doctype html>
 <html>
   <body>
-    <!-- Mirrors what the admin preview does: import the bundle on demand and
-         mount it into a shadow root with its own stylesheet, without widget.js
-         or the app proxy in the picture. -->
+    <!-- Mirrors what the admin preview does: pull the bundle in through a blob
+         module and mount it into a shadow root with its own stylesheet, with
+         neither widget.js nor the app proxy involved. -->
     <div id="preview-host"></div>
     <script type="module">
       window.__mountPreview = async (settings) => {
@@ -15,8 +15,16 @@
         shadow.appendChild(link);
         const container = document.createElement("div");
         shadow.appendChild(container);
-        const { mountPuzzle } = await import("../../assets/pieceup-app.js");
-        return mountPuzzle(container, settings, () => {});
+
+        const url = new URL("../../assets/pieceup-app.js", location.href).href;
+        const blob = URL.createObjectURL(
+          new Blob([`export * from "${url}";`], { type: "text/javascript" }),
+        );
+        const { mountPuzzle } = await import(blob);
+        URL.revokeObjectURL(blob);
+
+        window.__handle = mountPuzzle(container, settings, () => {});
+        return true;
       };
     </script>
   </body>

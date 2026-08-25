@@ -59,13 +59,21 @@ function gridFor(pieceCount: number) {
   return { rows, cols: Math.ceil(pieceCount / rows) };
 }
 
+export type PuzzleHandle = {
+  /** Fills in the coupon the reward panel shows, once the server has minted it. */
+  setRewardCode(code: string): void;
+  destroy(): void;
+};
+
 export function mountPuzzle(
   container: HTMLElement,
   config: PieceUpConfig,
   onComplete: () => void | Promise<void>,
-  rewardCode?: string,
-): () => void {
+): PuzzleHandle {
   const grid = gridFor(config.pieceCount ?? 9);
+  // The code does not exist until the puzzle is finished and the server has
+  // issued one, so the panel mounts without it and is redrawn when it arrives.
+  let rewardCode = "";
 
   const props: Props & { onTamamlandi?: () => void } = {
     ustEtiket: config.badgeLabel ?? undefined,
@@ -88,16 +96,29 @@ export function mountPuzzle(
     konfetiEfekti: true,
     hediyeAdimiAktif: config.giftStep ?? false,
     hediyeKutuModu: config.giftBoxMode ?? false,
-    kuponKodunuGoster: Boolean(rewardCode),
-    kuponKodu: rewardCode ?? "",
+    kuponKodunuGoster: true,
+    kuponKodu: "",
     karistirmaHakki: config.shuffleLimit ?? 0,
     vurguRengi: config.accentColor ?? "#1a1a1a",
     onTamamlandi: () => void onComplete(),
   };
 
-  render(
-    (<PuzzleKampanya {...props} /> as unknown) as ComponentChild,
-    container,
-  );
-  return () => render(null, container);
+  function draw() {
+    render(
+      ((<PuzzleKampanya {...props} kuponKodu={rewardCode} />) as unknown) as ComponentChild,
+      container,
+    );
+  }
+
+  draw();
+
+  return {
+    setRewardCode(code) {
+      rewardCode = code;
+      draw();
+    },
+    destroy() {
+      render(null, container);
+    },
+  };
 }
