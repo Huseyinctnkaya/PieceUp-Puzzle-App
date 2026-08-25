@@ -33,6 +33,9 @@ export async function initPieceUp(root) {
   }
 }
 
+/** How long the puzzle waits on its stylesheets before rendering regardless. */
+const STYLE_WAIT_MS = 2000;
+
 /**
  * Builds a shadow root to render into, with our stylesheets inside it.
  *
@@ -60,12 +63,37 @@ function createHost(root) {
   // still serving an older copy of the block. Without a stylesheet the trigger
   // is an unstyled button at the foot of the page instead of a fixed one in
   // the corner, which reads as the widget simply not being there.
-  for (const file of ["widget.css", "pieceup-app.css"]) {
+  const links = ["widget.css", "pieceup-app.css"].map((file) => {
     const link = document.createElement("link");
     link.rel = "stylesheet";
     link.href = new URL(file, import.meta.url).href;
     shadow.appendChild(link);
-  }
+    return link;
+  });
+
+  // The puzzle waits for these before it renders. Its badge icon is an SVG with
+  // no size of its own, so an unstyled frame shows it at the size of whatever
+  // contains it — a 19px icon filling the popup — and everything else is
+  // unstyled alongside it.
+  //
+  // Bounded by a timeout, and errors resolve as readily as loads. A stylesheet
+  // that never reports either way must not cost the shopper the puzzle: a
+  // moment of unstyled is a blemish, a puzzle that never appears is the bug
+  // this widget has already had three times over.
+  shadow.stylesReady = Promise.race([
+    Promise.all(
+      links.map(
+        (link) =>
+          new Promise((resolve) => {
+            if (link.sheet) return resolve();
+            link.addEventListener("load", resolve, { once: true });
+            link.addEventListener("error", resolve, { once: true });
+          }),
+      ),
+    ),
+    new Promise((resolve) => setTimeout(resolve, STYLE_WAIT_MS)),
+  ]);
+
   return shadow;
 }
 
@@ -95,38 +123,43 @@ function buildPopup(root, config, alreadyPlayed, identityKey) {
     overlay.hidden = true;
   }
 
-  function open() {
+  async function open() {
     overlay.hidden = false;
     trackOpen();
     if (alreadyPlayed) {
       renderMessage(content, "You've already played — thanks!");
-    } else {
-      const puzzle = mountPuzzle(content, config, async (giftIndex) => {
-        try {
-          const code = await submitCompletion(identityKey, giftIndex);
-          // Handed to the puzzle's own reward panel rather than replacing the
-          // whole popup: the reference shows the code in place, over the
-          // finished picture, and that is the moment worth keeping.
-          // Null is a "try again" prize rather than a failure: there is no
-          // code to show, and the puzzle's panel says so on its own.
-          if (code) puzzle.setRewardCode(code);
-        } catch (err) {
-          // The shop hit its plan's monthly reward allowance. That's not the
-          // shopper's fault and retrying won't help, so don't tell them to.
-          if (err && err.message === "reward_limit_reached") {
-            renderMessage(
-              content,
-              "This campaign is out of rewards for now. Check back later!",
-            );
-            return;
-          }
+      return;
+    }
+
+    // Held until the stylesheets are in, so the puzzle is never painted
+    // unstyled. Usually already resolved by the time anyone clicks.
+    if (root.stylesReady) await root.stylesReady;
+
+    const puzzle = mountPuzzle(content, config, async (giftIndex) => {
+      try {
+        const code = await submitCompletion(identityKey, giftIndex);
+        // Handed to the puzzle's own reward panel rather than replacing the
+        // whole popup: the reference shows the code in place, over the
+        // finished picture, and that is the moment worth keeping.
+        // Null is a "try again" prize rather than a failure: there is no
+        // code to show, and the puzzle's panel says so on its own.
+        if (code) puzzle.setRewardCode(code);
+      } catch (err) {
+        // The shop hit its plan's monthly reward allowance. That's not the
+        // shopper's fault and retrying won't help, so don't tell them to.
+        if (err && err.message === "reward_limit_reached") {
           renderMessage(
             content,
-            "Couldn't create your reward, please try again.",
+            "This campaign is out of rewards for now. Check back later!",
           );
+          return;
         }
-      });
-    }
+        renderMessage(
+          content,
+          "Couldn't create your reward, please try again.",
+        );
+      }
+    });
   }
 
   // Click on the backdrop (not the popup box itself) dismisses the popup.

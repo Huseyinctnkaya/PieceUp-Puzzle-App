@@ -61,6 +61,31 @@ function cardWidthFor(ratio: number, trayBeside: boolean) {
   );
 }
 
+/** How long the preview waits on its stylesheet before rendering regardless. */
+const STYLE_WAIT_MS = 2000;
+
+/**
+ * Resolves once a stylesheet has loaded, or failed to.
+ *
+ * Mounting before it arrives shows the puzzle unstyled for a frame or two, and
+ * the badge icon is the worst of it: the SVG carries no size of its own, so
+ * without CSS it fills its container — a 19px icon flashing up at 1100px.
+ * Resolving on error too, because an unstyled puzzle still beats none.
+ */
+function whenLoaded(link: HTMLLinkElement): Promise<void> {
+  return new Promise((resolve) => {
+    if (link.sheet) {
+      resolve();
+      return;
+    }
+    link.addEventListener("load", () => resolve(), { once: true });
+    link.addEventListener("error", () => resolve(), { once: true });
+    // Bounded, because a stylesheet that reports neither must not cost the
+    // merchant the preview entirely. Unstyled for a moment beats never.
+    setTimeout(resolve, STYLE_WAIT_MS);
+  });
+}
+
 /** Reads an image's aspect ratio, falling back to square if it won't load. */
 function ratioOf(src: string): Promise<number> {
   return new Promise((resolve) => {
@@ -164,7 +189,11 @@ function usePuzzleMount(settings: PreviewSettings, open: boolean) {
     // even behind @vite-ignore — because such files bypass its transforms. The
     // blob is a module whose only job is to re-export the real one, so the URL
     // is opaque to the bundler and resolved by the browser at runtime.
-    Promise.all([loadPuzzleBundle(), ratioOf(settings.imageUrl)])
+    Promise.all([
+      loadPuzzleBundle(),
+      ratioOf(settings.imageUrl),
+      whenLoaded(link),
+    ])
       .then(([puzzle, ratio]) => {
         if (cancelled) return;
 

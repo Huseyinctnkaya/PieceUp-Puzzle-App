@@ -41,6 +41,24 @@ beforeEach(async () => {
   ({ initPieceUp } = await import("./widget.js"));
 });
 
+/**
+ * Clicks the trigger and waits for the popup to finish opening.
+ *
+ * The popup waits for its stylesheets before mounting, and jsdom loads a
+ * <link> without ever firing its load event — so the event a browser would
+ * fire is dispatched here. Without it these tests would be waiting on the
+ * two-second fallback rather than on the behaviour they are about.
+ */
+async function openPopup(root) {
+  ui(root).querySelector(".pieceup-trigger").click();
+  for (const link of ui(root).querySelectorAll("link")) {
+    link.dispatchEvent(new Event("load"));
+  }
+  // One turn for the await in open(), one for the mount that follows it.
+  await Promise.resolve();
+  await Promise.resolve();
+}
+
 /** Where the widget renders: its own shadow root, out of the theme's reach. */
 function ui(root) {
   return root.shadowRoot ?? root;
@@ -56,10 +74,9 @@ describe("initPieceUp", () => {
     const root = document.getElementById("pieceup-root");
     await initPieceUp(root);
 
-    const button = ui(root).querySelector(".pieceup-trigger");
-    expect(button).not.toBeNull();
+    expect(ui(root).querySelector(".pieceup-trigger")).not.toBeNull();
 
-    button.click();
+    await openPopup(root);
     expect(ui(root).querySelector(".puzzle-kampanya")).not.toBeNull();
     expect(app.mountPuzzle).toHaveBeenCalledOnce();
   });
@@ -67,7 +84,7 @@ describe("initPieceUp", () => {
   it("passes the merchant's config through to the puzzle", async () => {
     const root = document.getElementById("pieceup-root");
     await initPieceUp(root);
-    ui(root).querySelector(".pieceup-trigger").click();
+    await openPopup(root);
 
     expect(vi.mocked(app.mountPuzzle).mock.calls[0][1]).toMatchObject({
       imageUrl: "https://example.com/img.jpg",
@@ -80,7 +97,7 @@ describe("initPieceUp", () => {
     const root = document.getElementById("pieceup-root");
     await initPieceUp(root);
 
-    ui(root).querySelector(".pieceup-trigger").click();
+    await openPopup(root);
     expect(ui(root).querySelector(".pieceup-message")).not.toBeNull();
     expect(app.mountPuzzle).not.toHaveBeenCalled();
   });
@@ -88,7 +105,7 @@ describe("initPieceUp", () => {
   it("hands the reward code to the puzzle's own panel", async () => {
     const root = document.getElementById("pieceup-root");
     await initPieceUp(root);
-    ui(root).querySelector(".pieceup-trigger").click();
+    await openPopup(root);
 
     await completionCallback()();
 
@@ -104,7 +121,7 @@ describe("initPieceUp", () => {
     );
     const root = document.getElementById("pieceup-root");
     await initPieceUp(root);
-    ui(root).querySelector(".pieceup-trigger").click();
+    await openPopup(root);
 
     await completionCallback()();
 
@@ -119,7 +136,7 @@ describe("initPieceUp", () => {
     vi.mocked(api.submitCompletion).mockRejectedValue(new Error("network"));
     const root = document.getElementById("pieceup-root");
     await initPieceUp(root);
-    ui(root).querySelector(".pieceup-trigger").click();
+    await openPopup(root);
 
     await completionCallback()();
 
@@ -131,7 +148,7 @@ describe("initPieceUp", () => {
   it("closes the popup via the close button", async () => {
     const root = document.getElementById("pieceup-root");
     await initPieceUp(root);
-    ui(root).querySelector(".pieceup-trigger").click();
+    await openPopup(root);
 
     const overlay = ui(root).querySelector(".pieceup-overlay");
     expect(overlay.hidden).toBe(false);
@@ -142,7 +159,7 @@ describe("initPieceUp", () => {
   it("closes on Escape, and does nothing on Escape while already closed", async () => {
     const root = document.getElementById("pieceup-root");
     await initPieceUp(root);
-    ui(root).querySelector(".pieceup-trigger").click();
+    await openPopup(root);
 
     const overlay = ui(root).querySelector(".pieceup-overlay");
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
