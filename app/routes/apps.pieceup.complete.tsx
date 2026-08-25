@@ -5,6 +5,7 @@ import {
   countRewardsThisMonth,
   hasAlreadyPlayed,
   recordCompletion,
+  type PlayLimitType,
 } from "../models/playRecord.server";
 import {
   issueRewardCode,
@@ -61,7 +62,7 @@ export async function action({ request }: ActionFunctionArgs) {
   const alreadyPlayed = await hasAlreadyPlayed(
     session.shop,
     identityKey,
-    config.playLimitType as "ONCE_EVER" | "ONCE_PER_DAY",
+    config.playLimitType as PlayLimitType,
   );
   if (alreadyPlayed) {
     return new Response(JSON.stringify({ error: "already_played" }), {
@@ -121,7 +122,13 @@ export async function action({ request }: ActionFunctionArgs) {
   try {
     // A "try again" prize still counts as a play: it is how the merchant caps
     // one go per shopper, and the absence of a code does not undo that.
-    await recordCompletion(session.shop, identityKey, code ?? "", gift.title);
+    await recordCompletion(
+      session.shop,
+      identityKey,
+      code ?? "",
+      gift.title,
+      config.playLimitType as PlayLimitType,
+    );
   } catch (error) {
     return new Response(JSON.stringify({ error: "already_played" }), {
       status: 409,

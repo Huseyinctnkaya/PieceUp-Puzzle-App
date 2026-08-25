@@ -278,6 +278,9 @@ describe("apps.pieceup.complete action", () => {
       "device:xyz",
       "PIECEUP-ABC123",
       "Free shipping",
+      // The limit travels with the record: it decides what the play is counted
+      // against, and the database enforces it from there.
+      "ONCE_EVER",
     );
   });
 

@@ -1,7 +1,10 @@
 import type { LoaderFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import { getActivePuzzleConfig } from "../models/puzzleConfig.server";
-import { hasAlreadyPlayed } from "../models/playRecord.server";
+import {
+  hasAlreadyPlayed,
+  type PlayLimitType,
+} from "../models/playRecord.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const { session } = await authenticate.public.appProxy(request);
@@ -26,7 +29,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const alreadyPlayed = await hasAlreadyPlayed(
     session.shop,
     identityKey,
-    config.playLimitType as "ONCE_EVER" | "ONCE_PER_DAY",
+    config.playLimitType as PlayLimitType,
   );
 
   return new Response(JSON.stringify({ alreadyPlayed }), {

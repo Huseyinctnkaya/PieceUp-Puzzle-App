@@ -1,21 +1,40 @@
+import { randomUUID } from "node:crypto";
 import db from "../db.server";
 
 export function todayDateString(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+export type PlayLimitType = "ONCE_EVER" | "ONCE_PER_DAY" | "UNLIMITED";
+
+/**
+ * What a play is counted against, which is what makes the limit enforceable.
+ *
+ * The unique index on (shop, identity, key) is the guarantee — the check below
+ * can lose a race with itself, the index cannot. With no limit each play needs
+ * a key nothing else will ever hold, or the database would refuse the second
+ * one regardless of what the merchant asked for.
+ */
+export function limitKeyFor(playLimitType: PlayLimitType): string {
+  if (playLimitType === "ONCE_PER_DAY") return todayDateString();
+  if (playLimitType === "UNLIMITED") return `free:${randomUUID()}`;
+  return "ever";
+}
+
 export async function hasAlreadyPlayed(
   shopDomain: string,
   identityKey: string,
-  playLimitType: "ONCE_EVER" | "ONCE_PER_DAY",
+  playLimitType: PlayLimitType,
 ): Promise<boolean> {
+  if (playLimitType === "UNLIMITED") return false;
+
   if (playLimitType === "ONCE_PER_DAY") {
     const record = await db.playRecord.findUnique({
       where: {
-        shopDomain_identityKey_playDate: {
+        shopDomain_identityKey_limitKey: {
           shopDomain,
           identityKey,
-          playDate: todayDateString(),
+          limitKey: todayDateString(),
         },
       },
     });
@@ -53,12 +72,14 @@ export async function recordCompletion(
   identityKey: string,
   discountCode: string,
   prizeTitle: string,
+  playLimitType: PlayLimitType = "ONCE_EVER",
 ): Promise<void> {
   await db.playRecord.create({
     data: {
       shopDomain,
       identityKey,
       playDate: todayDateString(),
+      limitKey: limitKeyFor(playLimitType),
       completed: true,
       discountCode,
       prizeTitle,

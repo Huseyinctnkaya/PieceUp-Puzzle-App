@@ -69,6 +69,10 @@ export async function action({ request, params }: ActionFunctionArgs) {
     shuffleLimit: Number(form.get("shuffleLimit") || 0),
     giftBoxMode: form.get("giftBoxMode") === "true",
     giftStep: form.get("giftStep") === "true",
+    triggerPage: String(form.get("triggerPage") || "ALL") as
+      "ALL" | "CART" | "PRODUCT",
+    playLimitType: String(form.get("playLimitType") || "ONCE_EVER") as
+      "ONCE_EVER" | "ONCE_PER_DAY" | "UNLIMITED",
     triggerMode: String(form.get("triggerMode") || "BUTTON") as
       "BUTTON" | "AUTO" | "BOTH",
     // Only meaningful when the puzzle opens on its own; null the rest of the
@@ -162,6 +166,8 @@ export default function PuzzleEdit() {
       giftBoxMode: String(config?.giftBoxMode ?? false),
       giftStep: String(config?.giftStep ?? false),
       triggerMode: config?.triggerMode ?? "BUTTON",
+      triggerPage: config?.triggerPage ?? "ALL",
+      playLimitType: config?.playLimitType ?? "ONCE_EVER",
       triggerDelaySeconds: String(config?.triggerDelaySeconds ?? 3),
       gifts: JSON.stringify(toDrafts(config?.gifts ?? [])),
       isActive: String(config?.isActive ?? false),
@@ -515,6 +521,40 @@ export default function PuzzleEdit() {
                   <s-option value="AUTO">Opens on its own</s-option>
                   <s-option value="BOTH">Both</s-option>
                 </s-select>
+
+                <s-select
+                  label="Show on"
+                  details="Which pages of your store the puzzle appears on."
+                  value={form.triggerPage}
+                  onChange={(event) =>
+                    setField("triggerPage", event.currentTarget.value)
+                  }
+                >
+                  <s-option value="ALL">Every page</s-option>
+                  <s-option value="PRODUCT">Product pages</s-option>
+                  <s-option value="CART">Cart</s-option>
+                </s-select>
+
+                <s-select
+                  label="How often a shopper can play"
+                  details="Shoppers are recognised by their customer account when signed in, and by their browser when not."
+                  value={form.playLimitType}
+                  onChange={(event) =>
+                    setField("playLimitType", event.currentTarget.value)
+                  }
+                >
+                  <s-option value="ONCE_EVER">Once per customer</s-option>
+                  <s-option value="ONCE_PER_DAY">Once a day</s-option>
+                  <s-option value="UNLIMITED">Unlimited</s-option>
+                </s-select>
+
+                {form.playLimitType === "UNLIMITED" ? (
+                  <s-banner tone="warning">
+                    Every win mints a discount code, so unlimited play means a
+                    shopper can keep collecting them. Your plan’s monthly reward
+                    limit is the only thing capping it.
+                  </s-banner>
+                ) : null}
 
                 {form.triggerMode !== "BUTTON" ? (
                   <s-number-field

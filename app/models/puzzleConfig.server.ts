@@ -45,7 +45,7 @@ export type PuzzleConfigInput = {
   triggerMode?: "BUTTON" | "AUTO" | "BOTH";
   triggerPage?: "CART" | "PRODUCT" | "ALL";
   triggerDelaySeconds?: number | null;
-  playLimitType?: "ONCE_EVER" | "ONCE_PER_DAY";
+  playLimitType?: "ONCE_EVER" | "ONCE_PER_DAY" | "UNLIMITED";
   isActive: boolean;
   startDate: Date | null;
   endDate: Date | null;
