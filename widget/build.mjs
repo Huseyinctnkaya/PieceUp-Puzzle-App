@@ -19,9 +19,9 @@ const here = dirname(fileURLToPath(import.meta.url));
 await build({
   entryPoints: [
     resolve(here, "src/entry.tsx"),
-    // The component stylesheet pulls in every sub-component's via @import, so
-    // this single entry produces the whole widget's CSS.
-    resolve(here, "src/components/PuzzleKampanya/styles.css"),
+    // One stylesheet that pulls in every component's, including the ones the
+    // campaign's own CSS does not reach.
+    resolve(here, "src/styles.css"),
   ],
   outdir: resolve(here, "../extensions/pieceup-widget/assets"),
   entryNames: "pieceup-app",

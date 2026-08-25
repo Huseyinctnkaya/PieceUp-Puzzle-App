@@ -1,0 +1,11 @@
+/* The widget's whole stylesheet, in one file.
+ *
+ * On ikas every component ships its own CSS and the platform loads whichever
+ * are on the page. We serve one bundle, and PuzzleKampanya only imports its
+ * sub-components — so the gift card, being a component in its own right, was
+ * left out and its cards rendered as bare buttons.
+ *
+ * Kept here rather than added to the vendored stylesheet, so the reference
+ * files stay exactly as they came. */
+@import "./components/PuzzleKampanya/styles.css";
+@import "./components/PuzzleHediyeKarti/styles.css";

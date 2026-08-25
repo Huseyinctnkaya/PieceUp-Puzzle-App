@@ -159,6 +159,23 @@ test("offers the merchant's gifts, then the reward", async ({ page }) => {
 
   await cards.first().click();
 
+  // The card's own stylesheet is a separate file from the campaign's, and was
+  // once left out of the bundle entirely — the cards then rendered as bare
+  // inline buttons, which still passed every assertion about their content.
+  const styled = await page.evaluate(() => {
+    const shadow = document.getElementById("preview-host")!.shadowRoot!;
+    const card = shadow.querySelector(".hediye-karti")!;
+    const box = card.getBoundingClientRect();
+    return {
+      display: getComputedStyle(card).display,
+      width: Math.round(box.width),
+      height: Math.round(box.height),
+    };
+  });
+  expect(styled.display).toBe("flex");
+  // A card, not a button squashed to its text.
+  expect(styled.height).toBeGreaterThan(80);
+
   // Opening a box is the choice: the gift is revealed and the reward follows.
   await expect(page.locator(".hediye-serit")).toContainText("Free shipping");
   await expect(page.locator(".odul-serit")).toHaveCount(1);
