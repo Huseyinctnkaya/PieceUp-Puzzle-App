@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { parseGifts, toDrafts, type GiftDraft } from "./gifts";
+import {
+  parseGifts,
+  summarisePrizes,
+  toDrafts,
+  type GiftDraft,
+} from "./gifts";
 
 /** The form submits its gift list as one JSON string. */
 function submitted(gifts: unknown[]) {
@@ -115,5 +120,39 @@ describe("the round trip", () => {
     };
 
     expect(roundTrip(draft)).toEqual(draft);
+  });
+});
+
+describe("summarisePrizes", () => {
+  /** A stored gift, as the list page receives it. */
+  function stored(overrides: Record<string, unknown> = {}) {
+    return {
+      title: "Prize",
+      description: null,
+      badgeLabel: null,
+      imageUrl: null,
+      discountType: "PERCENTAGE_OFF_ORDER",
+      discountValue: "10",
+      productIds: "[]",
+      collectionIds: "[]",
+      ...overrides,
+    };
+  }
+
+  it("describes the prize when there is only one", () => {
+    expect(summarisePrizes([stored({ discountType: "FREE_SHIPPING" })])).toBe(
+      "Free shipping",
+    );
+  });
+
+  it("counts them when there are several", () => {
+    // Listing three descriptions in a table cell reads worse than the count,
+    // and the merchant opens the puzzle to see them anyway.
+    expect(summarisePrizes([stored(), stored(), stored()])).toBe("3 prizes");
+  });
+
+  it("says so when a puzzle has none", () => {
+    // A puzzle with no prizes awards nothing, which is worth seeing in a list.
+    expect(summarisePrizes([])).toBe("No prizes");
   });
 });

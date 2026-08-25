@@ -15,7 +15,13 @@ import { getSubscription } from "../services/billing.server";
 import type { action as uploadAction } from "./app.upload";
 import { PuzzlePreview } from "../components/PuzzlePreview";
 import { reorder } from "../lib/reorder";
-import { EMPTY_GIFT, parseGifts, toDrafts, type GiftDraft } from "../lib/gifts";
+import {
+  describeGift,
+  EMPTY_GIFT,
+  parseGifts,
+  toDrafts,
+  type GiftDraft,
+} from "../lib/gifts";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { session } = await authenticate.admin(request);
@@ -119,30 +125,6 @@ function limitsToProducts(type: string) {
 /** Whether a type needs a number from the merchant at all. */
 function needsValue(type: string) {
   return type !== "FREE_SHIPPING" && type !== "NONE";
-}
-
-/** A one-line summary of what a gift is worth, for the collapsed row. */
-function describeGift(gift: GiftDraft) {
-  switch (gift.discountType) {
-    case "NONE":
-      return "No prize";
-    case "FREE_SHIPPING":
-      return "Free shipping";
-    case "AMOUNT_OFF_ORDER":
-      return `${gift.discountValue} off the order`;
-    case "PERCENTAGE_OFF_PRODUCTS":
-    case "AMOUNT_OFF_PRODUCTS": {
-      const count = gift.productIds.length + gift.collectionIds.length;
-      const scope = count ? `${count} selected` : "nothing selected yet";
-      const value =
-        gift.discountType === "PERCENTAGE_OFF_PRODUCTS"
-          ? `${gift.discountValue}%`
-          : gift.discountValue;
-      return `${value} off · ${scope}`;
-    }
-    default:
-      return `${gift.discountValue}% off the order`;
-  }
 }
 
 export default function PuzzleEdit() {

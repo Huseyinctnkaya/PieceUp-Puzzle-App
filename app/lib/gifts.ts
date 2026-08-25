@@ -97,9 +97,7 @@ export function parseGifts(raw: FormDataEntryValue | null): PuzzleGiftInput[] {
         description: String(gift.description ?? "").trim() || null,
         badgeLabel: String(gift.badgeLabel ?? "").trim() || null,
         imageUrl: String(gift.imageUrl ?? "").trim() || null,
-        discountType: String(
-          gift.discountType ?? EMPTY_GIFT.discountType,
-        ),
+        discountType: String(gift.discountType ?? EMPTY_GIFT.discountType),
         discountValue: String(gift.discountValue ?? EMPTY_GIFT.discountValue),
         // Re-serialised rather than passed through, so a malformed field
         // cannot reach the column the reward service parses back.
@@ -109,4 +107,45 @@ export function parseGifts(raw: FormDataEntryValue | null): PuzzleGiftInput[] {
   } catch {
     return [];
   }
+}
+
+/**
+ * A one-line summary of what a prize is worth.
+ *
+ * Shared so the puzzle list and the editor describe a prize the same way; the
+ * list used to read the retired reward columns and said "10% off" for
+ * everything.
+ */
+export function describeGift(gift: GiftDraft): string {
+  switch (gift.discountType) {
+    case "NONE":
+      return "No prize";
+    case "FREE_SHIPPING":
+      return "Free shipping";
+    case "AMOUNT_OFF_ORDER":
+      return `${gift.discountValue} off the order`;
+    case "PERCENTAGE_OFF_PRODUCTS":
+    case "AMOUNT_OFF_PRODUCTS": {
+      const count = gift.productIds.length + gift.collectionIds.length;
+      const scope = count ? `${count} selected` : "nothing selected yet";
+      const value =
+        gift.discountType === "PERCENTAGE_OFF_PRODUCTS"
+          ? `${gift.discountValue}%`
+          : gift.discountValue;
+      return `${value} off · ${scope}`;
+    }
+    default:
+      return `${gift.discountValue}% off the order`;
+  }
+}
+
+/**
+ * How a puzzle's prizes read in a list: the prize itself when there is one,
+ * and a count when there are several.
+ */
+export function summarisePrizes(gifts: StoredGift[]): string {
+  const drafts = toDrafts(gifts);
+  if (drafts.length === 0) return "No prizes";
+  if (drafts.length === 1) return describeGift(drafts[0]);
+  return `${drafts.length} prizes`;
 }

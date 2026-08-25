@@ -38,11 +38,10 @@ export type PuzzleConfigInput = {
    * form submits a list that may have had rows added, removed and reordered.
    */
   gifts?: PuzzleGiftInput[];
-  // Optional because the puzzle form no longer edits them — discounts and
-  // triggering get their own section. Leaving a key out of an update means
-  // "don't touch it", so an existing puzzle keeps what it was given.
-  rewardType?: "PERCENTAGE_DISCOUNT" | "FREE_PRODUCT_DISCOUNT";
-  rewardValue?: string;
+  // Optional because the puzzle form no longer edits them. Leaving a key out
+  // of an update means "don't touch it", so an existing puzzle keeps what it
+  // was given. The reward pair is gone entirely: prizes are gifts now, each
+  // with its own discount.
   triggerMode?: "BUTTON" | "AUTO" | "BOTH";
   triggerPage?: "CART" | "PRODUCT" | "ALL";
   triggerDelaySeconds?: number | null;
@@ -93,6 +92,7 @@ export async function listPuzzleConfigs(shopDomain: string) {
   return db.puzzleConfig.findMany({
     where: { shopDomain },
     orderBy: { createdAt: "desc" },
+    include: withGifts,
   });
 }
 

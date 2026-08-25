@@ -9,6 +9,7 @@ import {
   NotFoundError,
   PuzzleIsActiveError,
 } from "../models/puzzleConfig.server";
+import { summarisePrizes } from "../lib/gifts";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const { session } = await authenticate.admin(request);
@@ -41,12 +42,6 @@ const DELETE_ERROR_MESSAGES: Record<string, string> = {
   not_found: "Puzzle not found.",
   delete_failed: "Couldn't delete the puzzle.",
 };
-
-function rewardSummary(rewardType: string, rewardValue: string) {
-  if (rewardType === "PERCENTAGE_DISCOUNT") return `${rewardValue}% off`;
-  if (rewardType === "FREE_PRODUCT_DISCOUNT") return "Free product";
-  return rewardType;
-}
 
 export default function PuzzlesList() {
   const { puzzles } = useLoaderData<typeof loader>();
@@ -105,7 +100,7 @@ export default function PuzzlesList() {
                     but the cell below holds a badge that stays left-aligned,
                     so the two ended up visibly out of line. */}
                 <s-table-header listSlot="labeled">Pieces</s-table-header>
-                <s-table-header listSlot="labeled">Reward</s-table-header>
+                <s-table-header listSlot="labeled">Prizes</s-table-header>
                 <s-table-header>Actions</s-table-header>
               </s-table-header-row>
               <s-table-body>
@@ -124,7 +119,7 @@ export default function PuzzlesList() {
                     </s-table-cell>
                     <s-table-cell>
                       <s-text color="subdued">
-                        {rewardSummary(puzzle.rewardType, puzzle.rewardValue)}
+                        {summarisePrizes(puzzle.gifts)}
                       </s-text>
                     </s-table-cell>
                     <s-table-cell>
