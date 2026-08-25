@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import db from "../db.server";
+import type { PuzzleGiftInput } from "./puzzleConfig.server";
 import {
   createPuzzleConfig,
   updatePuzzleConfig,
@@ -7,6 +8,21 @@ import {
 } from "./puzzleConfig.server";
 
 const SHOP = "gift-test.myshopify.com";
+
+/** A gift with the fields every one needs, so a test names only what it varies. */
+function gift(overrides: Partial<PuzzleGiftInput> = {}): PuzzleGiftInput {
+  return {
+    title: "Prize",
+    description: null,
+    badgeLabel: null,
+    imageUrl: null,
+    discountType: "PERCENTAGE_OFF_ORDER",
+    discountValue: "10",
+    productIds: "[]",
+    collectionIds: "[]",
+    ...overrides,
+  };
+}
 
 const base = {
   name: "Puzzle",
@@ -29,8 +45,8 @@ describe("puzzle gifts", () => {
     const created = await createPuzzleConfig(SHOP, {
       ...base,
       gifts: [
-        { title: "Free shipping", description: null, badgeLabel: null, imageUrl: null },
-        { title: "10% off", description: "Next order", badgeLabel: "Popular", imageUrl: null },
+        gift({ title: "Free shipping" }),
+        gift({ title: "10% off", description: "Next order", badgeLabel: "Popular" }),
       ],
     });
 
@@ -46,14 +62,14 @@ describe("puzzle gifts", () => {
     const created = await createPuzzleConfig(SHOP, {
       ...base,
       gifts: [
-        { title: "One", description: null, badgeLabel: null, imageUrl: null },
-        { title: "Two", description: null, badgeLabel: null, imageUrl: null },
+        gift({ title: "One" }),
+        gift({ title: "Two" }),
       ],
     });
 
     await updatePuzzleConfig(SHOP, created.id, {
       ...base,
-      gifts: [{ title: "Only", description: null, badgeLabel: null, imageUrl: null }],
+      gifts: [gift({ title: "Only" })],
     });
 
     const loaded = await getPuzzleConfigById(SHOP, created.id);
@@ -65,7 +81,7 @@ describe("puzzle gifts", () => {
   it("leaves the gifts alone when an update doesn't mention them", async () => {
     const created = await createPuzzleConfig(SHOP, {
       ...base,
-      gifts: [{ title: "Kept", description: null, badgeLabel: null, imageUrl: null }],
+      gifts: [gift({ title: "Kept" })],
     });
 
     await updatePuzzleConfig(SHOP, created.id, { ...base, name: "Renamed" });
@@ -78,7 +94,7 @@ describe("puzzle gifts", () => {
   it("deletes a puzzle's gifts along with it", async () => {
     const created = await createPuzzleConfig(SHOP, {
       ...base,
-      gifts: [{ title: "Gone", description: null, badgeLabel: null, imageUrl: null }],
+      gifts: [gift({ title: "Gone" })],
     });
 
     await db.puzzleConfig.delete({ where: { id: created.id } });

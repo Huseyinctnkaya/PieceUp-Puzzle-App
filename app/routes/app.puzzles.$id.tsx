@@ -15,6 +15,7 @@ import { getSubscription } from "../services/billing.server";
 import type { action as uploadAction } from "./app.upload";
 import { PuzzlePreview } from "../components/PuzzlePreview";
 import { reorder } from "../lib/reorder";
+import { parseGifts } from "../lib/gifts";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { session } = await authenticate.admin(request);
@@ -35,26 +36,6 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
  * field should not cost the merchant the rest of their edits, and the list is
  * replaced wholesale on save anyway.
  */
-function parseGifts(raw: FormDataEntryValue | null) {
-  if (typeof raw !== "string" || !raw) return [];
-  try {
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .filter(
-        (gift) => gift && typeof gift.title === "string" && gift.title.trim(),
-      )
-      .map((gift) => ({
-        title: String(gift.title).trim(),
-        description: String(gift.description ?? "").trim() || null,
-        badgeLabel: String(gift.badgeLabel ?? "").trim() || null,
-        imageUrl: String(gift.imageUrl ?? "").trim() || null,
-      }));
-  } catch {
-    return [];
-  }
-}
-
 export async function action({ request, params }: ActionFunctionArgs) {
   const { session, admin } = await authenticate.admin(request);
   const form = await request.formData();

@@ -5,6 +5,14 @@ export type PuzzleGiftInput = {
   description: string | null;
   badgeLabel: string | null;
   imageUrl: string | null;
+  // Required rather than optional: a gift is a prize, and a prize with no
+  // discount behind it silently falls back to the column default — which is
+  // how three gifts once saved as "10% off" whatever the merchant chose.
+  discountType: string;
+  discountValue: string;
+  /** Shopify gids, as JSON. */
+  productIds: string;
+  collectionIds: string;
 };
 
 export type PuzzleConfigInput = {
