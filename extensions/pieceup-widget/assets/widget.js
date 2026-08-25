@@ -101,13 +101,15 @@ function buildPopup(root, config, alreadyPlayed, identityKey) {
     if (alreadyPlayed) {
       renderMessage(content, "You've already played — thanks!");
     } else {
-      const puzzle = mountPuzzle(content, config, async () => {
+      const puzzle = mountPuzzle(content, config, async (giftIndex) => {
         try {
-          const code = await submitCompletion(identityKey);
+          const code = await submitCompletion(identityKey, giftIndex);
           // Handed to the puzzle's own reward panel rather than replacing the
           // whole popup: the reference shows the code in place, over the
           // finished picture, and that is the moment worth keeping.
-          puzzle.setRewardCode(code);
+          // Null is a "try again" prize rather than a failure: there is no
+          // code to show, and the puzzle's panel says so on its own.
+          if (code) puzzle.setRewardCode(code);
         } catch (err) {
           // The shop hit its plan's monthly reward allowance. That's not the
           // shopper's fault and retrying won't help, so don't tell them to.

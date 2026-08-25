@@ -6,9 +6,24 @@ import {
   hasAlreadyPlayed,
   recordCompletion,
 } from "../models/playRecord.server";
-import { issueRewardCode } from "../services/rewardService.server";
+import {
+  issueRewardCode,
+  type DiscountType,
+} from "../services/rewardService.server";
 import { getSubscription } from "../services/billing.server";
 import { recordStat } from "../models/puzzleStat.server";
+
+/** Reads a stored gid list, treating anything malformed as an empty one. */
+function parseIds(raw: string): string[] {
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? parsed.filter((id) => typeof id === "string")
+      : [];
+  } catch {
+    return [];
+  }
+}
 
 export async function action({ request }: ActionFunctionArgs) {
   if (request.method !== "POST") {
@@ -25,6 +40,9 @@ export async function action({ request }: ActionFunctionArgs) {
 
   const body = await request.json();
   const identityKey = body.identityKey as string | undefined;
+  // Which gift the shopper picked, by its place in the list. Absent when the
+  // puzzle has no gift step, in which case the first gift is the prize.
+  const giftIndex = typeof body.giftIndex === "number" ? body.giftIndex : null;
   if (!identityKey) {
     return new Response(JSON.stringify({ error: "missing identityKey" }), {
       status: 400,
@@ -72,14 +90,28 @@ export async function action({ request }: ActionFunctionArgs) {
     }
   }
 
-  let code: string;
+  // The prize is the gift they chose. Indexed rather than named because two
+  // gifts may share a title, and the index is what the storefront knows. Out of
+  // range falls back to the first gift rather than failing: a shopper who
+  // finished the puzzle should not be denied a prize over a stale list.
+  const gift = config.gifts[giftIndex ?? 0] ?? config.gifts[0];
+  if (!gift) {
+    return new Response(JSON.stringify({ error: "no_reward_configured" }), {
+      status: 409,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  let code: string | null;
   try {
     code = await issueRewardCode(admin, {
-      rewardType: config.rewardType as
-        "PERCENTAGE_DISCOUNT" | "FREE_PRODUCT_DISCOUNT",
-      rewardValue: config.rewardValue,
+      discountType: gift.discountType as DiscountType,
+      discountValue: gift.discountValue,
+      productIds: parseIds(gift.productIds),
+      collectionIds: parseIds(gift.collectionIds),
     });
   } catch (error) {
+    console.error("Failed to issue reward", session.shop, error);
     return new Response(JSON.stringify({ error: "reward_issuance_failed" }), {
       status: 502,
       headers: { "Content-Type": "application/json" },
@@ -87,7 +119,9 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   try {
-    await recordCompletion(session.shop, identityKey, code);
+    // A "try again" prize still counts as a play: it is how the merchant caps
+    // one go per shopper, and the absence of a code does not undo that.
+    await recordCompletion(session.shop, identityKey, code ?? "");
   } catch (error) {
     return new Response(JSON.stringify({ error: "already_played" }), {
       status: 409,
@@ -95,7 +129,9 @@ export async function action({ request }: ActionFunctionArgs) {
     });
   }
 
-  await recordStat(session.shop, config.id, "rewarded");
+  // Only a real code counts as rewarded, so the funnel keeps meaning what it
+  // says: a shopper who won "try again" was not rewarded.
+  if (code) await recordStat(session.shop, config.id, "rewarded");
 
   return new Response(JSON.stringify({ discountCode: code }), {
     status: 200,

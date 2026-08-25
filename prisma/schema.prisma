@@ -92,6 +92,17 @@ model PuzzleGift {
   description    String?
   badgeLabel     String?
   imageUrl       String?
+
+  /// What this gift is actually worth. NONE mints no code at all — the
+  /// "try again" prize — which is why the type is not implied by the value.
+  discountType   String   @default("PERCENTAGE_OFF_ORDER")
+  /// Percentage (1-100) or a money amount, by type. Unused for the others.
+  discountValue  String   @default("10")
+  /// Shopify gids the discount is limited to, as JSON. Empty means the whole
+  /// order. Stored as JSON rather than its own table: it is a list the admin
+  /// writes and the reward service reads back whole, never queried across.
+  productIds     String   @default("[]")
+  collectionIds  String   @default("[]")
   /// Display order, so the merchant's arrangement survives a reload.
   position       Int          @default(0)
   createdAt      DateTime     @default(now())

@@ -163,3 +163,49 @@ test("offers the merchant's gifts, then the reward", async ({ page }) => {
   await expect(page.locator(".hediye-serit")).toContainText("Free shipping");
   await expect(page.locator(".odul-serit")).toHaveCount(1);
 });
+
+/**
+ * Which gift was chosen decides the discount, so it has to reach the server.
+ * Awarding the first gift regardless would give every shopper the same prize
+ * no matter which box they opened.
+ */
+test("reports which gift the shopper chose", async ({ page }) => {
+  await page.goto(fixtureUrl);
+  await page.evaluate((imageUrl) => {
+    window.localStorage.setItem(
+      `ikas-puzzle:${imageUrl}:2x2`,
+      JSON.stringify({ tur: 0, yerlesenler: [0, 1, 2, 3], hamle: 4, tamamlandi: true }),
+    );
+  }, IMAGE);
+
+  await page.evaluate((imageUrl) => {
+    const w = window as unknown as {
+      __mountPreview: (
+        settings: Record<string, unknown>,
+        onComplete?: (giftIndex: number) => void,
+      ) => Promise<unknown>;
+      __chosen: number[];
+    };
+    w.__chosen = [];
+    return w.__mountPreview(
+      {
+        imageUrl,
+        pieceCount: 4,
+        headline: "Preview",
+        shuffleKey: imageUrl,
+        rememberProgress: true,
+        giftStep: true,
+        giftBoxMode: true,
+        gifts: [{ title: "First" }, { title: "Second" }, { title: "Third" }],
+      },
+      (giftIndex: number) => w.__chosen.push(giftIndex),
+    );
+  }, IMAGE);
+
+  await page.locator(".hediye-karti").nth(2).click();
+
+  const chosen = await page.evaluate(
+    () => (window as unknown as { __chosen: number[] }).__chosen,
+  );
+  expect(chosen).toEqual([2]);
+});

@@ -116,12 +116,16 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
 }
 
-/** A gift as the form holds it: every field a string, none of them required. */
+/** A gift as the form holds it, display and discount together. */
 type GiftDraft = {
   title: string;
   description: string;
   badgeLabel: string;
   imageUrl: string;
+  discountType: string;
+  discountValue: string;
+  productIds: string[];
+  collectionIds: string[];
 };
 
 const EMPTY_GIFT: GiftDraft = {
@@ -129,7 +133,58 @@ const EMPTY_GIFT: GiftDraft = {
   description: "",
   badgeLabel: "",
   imageUrl: "",
+  discountType: "PERCENTAGE_OFF_ORDER",
+  discountValue: "10",
+  productIds: [],
+  collectionIds: [],
 };
+
+/**
+ * The prizes a merchant can offer, in the language Shopify's own discount
+ * picker uses so the choice reads the same in both places.
+ */
+const DISCOUNT_TYPES = [
+  { value: "PERCENTAGE_OFF_ORDER", label: "Percentage off the order" },
+  { value: "AMOUNT_OFF_ORDER", label: "Amount off the order" },
+  { value: "PERCENTAGE_OFF_PRODUCTS", label: "Percentage off products" },
+  { value: "AMOUNT_OFF_PRODUCTS", label: "Amount off products" },
+  { value: "FREE_SHIPPING", label: "Free shipping" },
+  { value: "NONE", label: "No prize (try again)" },
+] as const;
+
+/** Whether a type discounts specific items rather than the whole order. */
+function limitsToProducts(type: string) {
+  return type === "PERCENTAGE_OFF_PRODUCTS" || type === "AMOUNT_OFF_PRODUCTS";
+}
+
+/** Whether a type needs a number from the merchant at all. */
+function needsValue(type: string) {
+  return type !== "FREE_SHIPPING" && type !== "NONE";
+}
+
+/** A one-line summary of what a gift is worth, for the collapsed row. */
+function describeGift(gift: GiftDraft) {
+  switch (gift.discountType) {
+    case "NONE":
+      return "No prize";
+    case "FREE_SHIPPING":
+      return "Free shipping";
+    case "AMOUNT_OFF_ORDER":
+      return `${gift.discountValue} off the order`;
+    case "PERCENTAGE_OFF_PRODUCTS":
+    case "AMOUNT_OFF_PRODUCTS": {
+      const count = gift.productIds.length + gift.collectionIds.length;
+      const scope = count ? `${count} selected` : "nothing selected yet";
+      const value =
+        gift.discountType === "PERCENTAGE_OFF_PRODUCTS"
+          ? `${gift.discountValue}%`
+          : gift.discountValue;
+      return `${value} off · ${scope}`;
+    }
+    default:
+      return `${gift.discountValue}% off the order`;
+  }
+}
 
 export default function PuzzleEdit() {
   const { config, isNew } = useLoaderData<typeof loader>();
@@ -183,7 +238,10 @@ export default function PuzzleEdit() {
   const gifts = useMemo<GiftDraft[]>(() => {
     try {
       const parsed = JSON.parse(form.gifts);
-      return Array.isArray(parsed) ? parsed : [];
+      if (!Array.isArray(parsed)) return [];
+      // Merged over a blank gift so a row saved before the discount fields
+      // existed still has every key the editors read.
+      return parsed.map((gift) => ({ ...EMPTY_GIFT, ...gift }));
     } catch {
       return [];
     }
@@ -209,6 +267,34 @@ export default function PuzzleEdit() {
   function updateGift(index: number, patch: Partial<GiftDraft>) {
     setGifts(
       gifts.map((gift, i) => (i === index ? { ...gift, ...patch } : gift)),
+    );
+  }
+
+  /** Moves a gift up or down the list; the order is what shoppers see. */
+  function moveGift(index: number, direction: -1 | 1) {
+    const target = index + direction;
+    if (target < 0 || target >= gifts.length) return;
+    const next = [...gifts];
+    [next[index], next[target]] = [next[target], next[index]];
+    setGifts(next);
+  }
+
+  /** Opens Shopify's own picker, so the merchant searches their real catalog. */
+  async function pickResources(index: number, type: "product" | "collection") {
+    const gift = gifts[index];
+    const current = type === "product" ? gift.productIds : gift.collectionIds;
+    const selection = await shopify.resourcePicker({
+      type,
+      multiple: true,
+      selectionIds: current.map((id) => ({ id })),
+    });
+    // Dismissing the picker returns nothing, which must leave the selection
+    // alone rather than clear it.
+    if (!selection) return;
+    const ids = selection.map((resource) => resource.id);
+    updateGift(
+      index,
+      type === "product" ? { productIds: ids } : { collectionIds: ids },
     );
   }
 
@@ -587,6 +673,44 @@ export default function PuzzleEdit() {
                       borderRadius="base"
                     >
                       <s-stack gap="base">
+                        <s-stack
+                          direction="inline"
+                          gap="small"
+                          alignItems="center"
+                        >
+                          <s-stack gap="none">
+                            <s-text type="strong">
+                              {gift.title || "Untitled gift"}
+                            </s-text>
+                            <s-text color="subdued">
+                              {describeGift(gift)}
+                            </s-text>
+                          </s-stack>
+                          {/* Buttons rather than drag handles: dragging needs a
+                              pointer, and this list is short enough that two
+                              taps beat a drag anyone can miss. */}
+                          <s-button
+                            icon="chevron-up"
+                            accessibilityLabel="Move up"
+                            disabled={index === 0}
+                            onClick={() => moveGift(index, -1)}
+                          />
+                          <s-button
+                            icon="chevron-down"
+                            accessibilityLabel="Move down"
+                            disabled={index === gifts.length - 1}
+                            onClick={() => moveGift(index, 1)}
+                          />
+                          <s-button
+                            icon="delete"
+                            tone="critical"
+                            accessibilityLabel="Remove gift"
+                            onClick={() =>
+                              setGifts(gifts.filter((_, i) => i !== index))
+                            }
+                          />
+                        </s-stack>
+
                         <s-text-field
                           label="Gift name"
                           value={gift.title}
@@ -596,6 +720,7 @@ export default function PuzzleEdit() {
                             })
                           }
                         />
+
                         <s-text-field
                           label="Description"
                           value={gift.description}
@@ -605,6 +730,7 @@ export default function PuzzleEdit() {
                             })
                           }
                         />
+
                         <s-text-field
                           label="Badge"
                           details="Small label on the card. Leave empty to hide."
@@ -615,14 +741,65 @@ export default function PuzzleEdit() {
                             })
                           }
                         />
-                        <s-button
-                          tone="critical"
-                          onClick={() =>
-                            setGifts(gifts.filter((_, i) => i !== index))
+
+                        <s-select
+                          label="Discount"
+                          value={gift.discountType}
+                          onChange={(event) =>
+                            updateGift(index, {
+                              discountType: event.currentTarget.value,
+                            })
                           }
                         >
-                          Remove gift
-                        </s-button>
+                          {DISCOUNT_TYPES.map((type) => (
+                            <s-option key={type.value} value={type.value}>
+                              {type.label}
+                            </s-option>
+                          ))}
+                        </s-select>
+
+                        {needsValue(gift.discountType) ? (
+                          <s-number-field
+                            label={
+                              gift.discountType.startsWith("PERCENTAGE")
+                                ? "Percentage off"
+                                : "Amount off"
+                            }
+                            min={0}
+                            value={gift.discountValue}
+                            onChange={(event) =>
+                              updateGift(index, {
+                                discountValue: event.currentTarget.value,
+                              })
+                            }
+                          />
+                        ) : null}
+
+                        {limitsToProducts(gift.discountType) ? (
+                          <s-stack gap="small">
+                            <s-text color="subdued">
+                              {gift.productIds.length +
+                                gift.collectionIds.length ===
+                              0
+                                ? "Nothing selected — the discount would apply to the whole order."
+                                : `${gift.productIds.length} products, ${gift.collectionIds.length} collections`}
+                            </s-text>
+                            <s-stack direction="inline" gap="small">
+                              <s-button
+                                onClick={() => pickResources(index, "product")}
+                              >
+                                Choose products
+                              </s-button>
+                              <s-button
+                                onClick={() =>
+                                  pickResources(index, "collection")
+                                }
+                              >
+                                Choose collections
+                              </s-button>
+                            </s-stack>
+                          </s-stack>
+                        ) : null}
                       </s-stack>
                     </s-box>
                   ))}

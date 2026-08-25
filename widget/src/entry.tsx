@@ -83,14 +83,22 @@ export type PuzzleHandle = {
 export function mountPuzzle(
   container: HTMLElement,
   config: PieceUpConfig,
-  onComplete: () => void | Promise<void>,
+  /**
+   * Called once the shopper has earned their prize, with which gift they chose.
+   * With a gift step that is when they pick; without one it is when the last
+   * piece lands, and the index is 0.
+   */
+  onComplete: (giftIndex: number) => void | Promise<void>,
 ): PuzzleHandle {
   const grid = gridFor(config.pieceCount ?? 9);
   // The code does not exist until the puzzle is finished and the server has
   // issued one, so the panel mounts without it and is redrawn when it arrives.
   let rewardCode = "";
 
-  const props: Props & { onTamamlandi?: () => void } = {
+  const props: Props & {
+    onTamamlandi?: () => void;
+    onHediyeSecildi?: (giftIndex: number) => void;
+  } = {
     ustEtiket: config.badgeLabel ?? undefined,
     baslik: config.headline ?? "",
     aciklama: config.description ?? undefined,
@@ -128,7 +136,12 @@ export function mountPuzzle(
     karistirmaHakki: config.shuffleLimit ?? 0,
     vurguRengi: config.accentColor ?? "#1a1a1a",
     dikeyBosluk: range(config.compact ? 0 : 72),
-    onTamamlandi: () => void onComplete(),
+    // With a gift step the prize is not known until one is chosen, so
+    // completing the puzzle is not yet the moment to award anything.
+    onTamamlandi: () => {
+      if (!config.giftStep) void onComplete(0);
+    },
+    onHediyeSecildi: (giftIndex: number) => void onComplete(giftIndex),
   };
 
   function draw() {

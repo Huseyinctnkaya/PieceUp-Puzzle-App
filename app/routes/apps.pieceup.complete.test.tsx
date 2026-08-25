@@ -42,9 +42,17 @@ beforeEach(() => {
   } as unknown as Awaited<ReturnType<typeof authenticate.public.appProxy>>);
   vi.mocked(getActivePuzzleConfig).mockResolvedValue({
     id: "puzzle-1",
-    rewardType: "PERCENTAGE_DISCOUNT",
-    rewardValue: "10",
     playLimitType: "ONCE_EVER",
+    // The prize is a gift now, so a puzzle without one has nothing to award.
+    gifts: [
+      {
+        title: "10% off",
+        discountType: "PERCENTAGE_OFF_ORDER",
+        discountValue: "10",
+        productIds: "[]",
+        collectionIds: "[]",
+      },
+    ],
   } as unknown as Awaited<ReturnType<typeof getActivePuzzleConfig>>);
   vi.mocked(hasAlreadyPlayed).mockResolvedValue(false);
   vi.mocked(issueRewardCode).mockResolvedValue("PIECEUP-ABC123");
@@ -152,5 +160,106 @@ describe("apps.pieceup.complete action", () => {
     const response = await invoke({ identityKey: "device:xyz" });
     expect(response.status).toBe(200);
     expect((await response.json()).discountCode).toBe("PIECEUP-ABC123");
+  });
+
+  it("awards the gift the shopper picked, not the first one", async () => {
+    vi.mocked(getActivePuzzleConfig).mockResolvedValue({
+      id: "puzzle-1",
+      playLimitType: "ONCE_EVER",
+      gifts: [
+        {
+          title: "10% off",
+          discountType: "PERCENTAGE_OFF_ORDER",
+          discountValue: "10",
+          productIds: "[]",
+          collectionIds: "[]",
+        },
+        {
+          title: "Free shipping",
+          discountType: "FREE_SHIPPING",
+          discountValue: "",
+          productIds: "[]",
+          collectionIds: "[]",
+        },
+      ],
+    } as unknown as Awaited<ReturnType<typeof getActivePuzzleConfig>>);
+
+    await invoke({ identityKey: "device:xyz", giftIndex: 1 });
+
+    expect(issueRewardCode).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ discountType: "FREE_SHIPPING" }),
+    );
+  });
+
+  it("parses the product ids stored against a gift", async () => {
+    vi.mocked(getActivePuzzleConfig).mockResolvedValue({
+      id: "puzzle-1",
+      playLimitType: "ONCE_EVER",
+      gifts: [
+        {
+          title: "Half off",
+          discountType: "PERCENTAGE_OFF_PRODUCTS",
+          discountValue: "50",
+          // Stored as JSON, so a discount limited to products only works if
+          // this is read back as a list rather than passed on as a string.
+          productIds: '["gid://shopify/Product/1"]',
+          collectionIds: "[]",
+        },
+      ],
+    } as unknown as Awaited<ReturnType<typeof getActivePuzzleConfig>>);
+
+    await invoke({ identityKey: "device:xyz" });
+
+    expect(issueRewardCode).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ productIds: ["gid://shopify/Product/1"] }),
+    );
+  });
+
+  it("records a try-again play without counting it as rewarded", async () => {
+    vi.mocked(getActivePuzzleConfig).mockResolvedValue({
+      id: "puzzle-1",
+      playLimitType: "ONCE_EVER",
+      gifts: [
+        {
+          title: "Try again",
+          discountType: "NONE",
+          discountValue: "",
+          productIds: "[]",
+          collectionIds: "[]",
+        },
+      ],
+    } as unknown as Awaited<ReturnType<typeof getActivePuzzleConfig>>);
+    vi.mocked(issueRewardCode).mockResolvedValue(null);
+
+    const response = await invoke({ identityKey: "device:xyz" });
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).discountCode).toBeNull();
+    // Still a play — it is how "once per shopper" is enforced — but not a
+    // reward, or the funnel would claim a prize nobody was given.
+    expect(recordCompletion).toHaveBeenCalled();
+    expect(recordStat).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      "rewarded",
+    );
+  });
+
+  it("refuses to complete a puzzle with no gifts configured", async () => {
+    vi.mocked(getActivePuzzleConfig).mockResolvedValue({
+      id: "puzzle-1",
+      playLimitType: "ONCE_EVER",
+      gifts: [],
+    } as unknown as Awaited<ReturnType<typeof getActivePuzzleConfig>>);
+
+    const response = await invoke({ identityKey: "device:xyz" });
+
+    expect(response.status).toBe(409);
+    expect((await response.json()).error).toBe("no_reward_configured");
+    // Nothing is recorded, so the shopper can play again once the merchant
+    // fixes it rather than being locked out of a puzzle that gave them nothing.
+    expect(recordCompletion).not.toHaveBeenCalled();
   });
 });

@@ -6,7 +6,7 @@
          neither widget.js nor the app proxy involved. -->
     <div id="preview-host"></div>
     <script type="module">
-      window.__mountPreview = async (settings) => {
+      window.__mountPreview = async (settings, onComplete) => {
         const host = document.getElementById("preview-host");
         const shadow = host.attachShadow({ mode: "open" });
         const link = document.createElement("link");
@@ -23,7 +23,11 @@
         const { mountPuzzle } = await import(blob);
         URL.revokeObjectURL(blob);
 
-        window.__handle = mountPuzzle(container, settings, () => {});
+        window.__handle = mountPuzzle(
+          container,
+          settings,
+          onComplete ?? (() => {}),
+        );
         return true;
       };
     </script>

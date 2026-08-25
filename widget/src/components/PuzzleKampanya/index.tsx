@@ -281,6 +281,11 @@ export function PuzzleKampanya(props: Props) {
     return hediyeSecimineAbone(async (detay: HediyeSecimDetayi) => {
       setSeciliHediye(detay.kartId);
       seciliIndeksRef.current = typeof detay.indeks === "number" ? detay.indeks : null;
+      // PieceUp eklemesi: ödül seçilen hediyeye göre sunucuda üretiliyor, bu
+      // yüzden hangi hediyenin seçildiğini host'a bildiriyoruz. Referansta yok.
+      (props as { onHediyeSecildi?: (indeks: number) => void }).onHediyeSecildi?.(
+        seciliIndeksRef.current ?? 0
+      );
 
       const davranis = davranisRef.current ?? "sepeteEkle";
       if (davranis === "sepeteEkle" && detay.urun) {

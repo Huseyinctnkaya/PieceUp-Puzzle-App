@@ -47,11 +47,13 @@ export function trackOpen() {
   }).catch(() => {});
 }
 
-export async function submitCompletion(identityKey) {
+export async function submitCompletion(identityKey, giftIndex = 0) {
   const res = await fetch(`${PROXY_BASE}/complete`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ identityKey }),
+    // The gift decides the discount, so which one was chosen has to travel
+    // with the completion rather than be assumed on the server.
+    body: JSON.stringify({ identityKey, giftIndex }),
   });
   const data = await res.json();
   if (!res.ok) {
