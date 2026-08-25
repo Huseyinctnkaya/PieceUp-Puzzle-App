@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseGifts } from "./gifts";
+import { parseGifts, toDrafts, type GiftDraft } from "./gifts";
 
 /** The form submits its gift list as one JSON string. */
 function submitted(gifts: unknown[]) {
@@ -74,5 +74,46 @@ describe("parseGifts", () => {
     expect(parseGifts("not json")).toEqual([]);
     expect(parseGifts(null)).toEqual([]);
     expect(parseGifts(submitted([]))).toEqual([]);
+  });
+});
+
+describe("the round trip", () => {
+  /** Saves a draft and reads it back, the way editing a puzzle twice does. */
+  function roundTrip(draft: GiftDraft): GiftDraft {
+    const [stored] = parseGifts(JSON.stringify([draft]));
+    return toDrafts([stored])[0];
+  }
+
+  it("gives back exactly what was saved", () => {
+    const draft: GiftDraft = {
+      title: "Kargo Bedava",
+      description: "Siparişinde ücretsiz kargo",
+      badgeLabel: "Popüler",
+      imageUrl: "",
+      discountType: "FREE_SHIPPING",
+      discountValue: "10",
+      productIds: [],
+      collectionIds: [],
+    };
+
+    // This is the property both bugs broke: once on the way out, so every
+    // prize saved as 10% off, and once on the way back, so choosing a type
+    // and reopening the page showed the default again.
+    expect(roundTrip(draft)).toEqual(draft);
+  });
+
+  it("gives back a product selection intact", () => {
+    const draft: GiftDraft = {
+      title: "Half off",
+      description: "",
+      badgeLabel: "",
+      imageUrl: "",
+      discountType: "PERCENTAGE_OFF_PRODUCTS",
+      discountValue: "50",
+      productIds: ["gid://shopify/Product/1", "gid://shopify/Product/2"],
+      collectionIds: ["gid://shopify/Collection/3"],
+    };
+
+    expect(roundTrip(draft)).toEqual(draft);
   });
 });

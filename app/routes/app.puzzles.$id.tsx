@@ -15,7 +15,7 @@ import { getSubscription } from "../services/billing.server";
 import type { action as uploadAction } from "./app.upload";
 import { PuzzlePreview } from "../components/PuzzlePreview";
 import { reorder } from "../lib/reorder";
-import { parseGifts } from "../lib/gifts";
+import { EMPTY_GIFT, parseGifts, toDrafts, type GiftDraft } from "../lib/gifts";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const { session } = await authenticate.admin(request);
@@ -98,29 +98,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
 }
 
-/** A gift as the form holds it, display and discount together. */
-type GiftDraft = {
-  title: string;
-  description: string;
-  badgeLabel: string;
-  imageUrl: string;
-  discountType: string;
-  discountValue: string;
-  productIds: string[];
-  collectionIds: string[];
-};
-
-const EMPTY_GIFT: GiftDraft = {
-  title: "",
-  description: "",
-  badgeLabel: "",
-  imageUrl: "",
-  discountType: "PERCENTAGE_OFF_ORDER",
-  discountValue: "10",
-  productIds: [],
-  collectionIds: [],
-};
-
 /**
  * The prizes a merchant can offer, in the language Shopify's own discount
  * picker uses so the choice reads the same in both places.
@@ -194,14 +171,7 @@ export default function PuzzleEdit() {
       shuffleLimit: String(config?.shuffleLimit ?? 0),
       giftBoxMode: String(config?.giftBoxMode ?? false),
       giftStep: String(config?.giftStep ?? false),
-      gifts: JSON.stringify(
-        (config?.gifts ?? []).map((gift) => ({
-          title: gift.title,
-          description: gift.description ?? "",
-          badgeLabel: gift.badgeLabel ?? "",
-          imageUrl: gift.imageUrl ?? "",
-        })),
-      ),
+      gifts: JSON.stringify(toDrafts(config?.gifts ?? [])),
       isActive: String(config?.isActive ?? false),
     }),
     [config],
