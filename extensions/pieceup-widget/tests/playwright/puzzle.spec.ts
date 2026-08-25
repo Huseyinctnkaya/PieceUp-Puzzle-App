@@ -34,7 +34,9 @@ async function openPuzzle(page: Page, overrides: ConfigOverrides = {}) {
     route.fulfill({ json: { ok: true } }),
   );
 
-  await page.goto(fixtureUrl);
+  // Only navigate if the caller hasn't already — a test may need to set the
+  // page up (injecting CSS, say) before the widget initialises.
+  if (!page.url().includes("fixture.html")) await page.goto(fixtureUrl);
   await page.evaluate(() => {
     const w = window as unknown as {
       __initPieceUp: (root: HTMLElement | null) => Promise<void>;
@@ -150,4 +152,60 @@ test("tells a returning shopper they've already played", async ({ page }) => {
     "already played",
   );
   await expect(page.locator(".parca")).toHaveCount(0);
+});
+
+/**
+ * The widget renders on a page whose CSS belongs to the merchant.
+ *
+ * A theme rule that takes `position` off an ancestor is enough to break the
+ * puzzle: the pieces are positioned absolutely inside their stage, so they
+ * resolve against whatever is positioned further up and land off the popup,
+ * leaving the tray looking empty. That is what a merchant hit. Rendering in a
+ * shadow root is what stops page CSS reaching them at all, and this is the test
+ * that says so — the rules below are deliberately as hostile as CSS allows.
+ */
+test("is not affected by the page's own stylesheet", async ({ page }) => {
+  await page.goto(fixtureUrl);
+  await page.addStyleTag({
+    content: [
+      ".puzzle-alan, .tahta, .tepsi, .oyun-sarmal, .oyun-kutusu {",
+      "  position: static !important;",
+      "  display: block !important;",
+      "  width: auto !important;",
+      "  transform: none !important;",
+      "}",
+      ".parca { position: static !important; visibility: hidden !important; }",
+    ].join("\n"),
+  });
+
+  await openPuzzle(page);
+  await page.click(".ortu .ana-buton");
+
+  const geometry = await page.evaluate(() => {
+    const shadow = document.getElementById("pieceup-root")!.shadowRoot!;
+    const card = shadow
+      .querySelector(".oyun-kutusu")!
+      .getBoundingClientRect();
+    const pieces = Array.from(shadow.querySelectorAll(".parca"));
+    return {
+      count: pieces.length,
+      // Every piece must still be laid out inside the card the shopper sees.
+      strays: pieces.filter((piece) => {
+        const rect = piece.getBoundingClientRect();
+        return (
+          rect.right < card.left ||
+          rect.left > card.right ||
+          rect.bottom < card.top ||
+          rect.top > card.bottom
+        );
+      }).length,
+      hidden: pieces.filter(
+        (piece) => getComputedStyle(piece).visibility === "hidden",
+      ).length,
+    };
+  });
+
+  expect(geometry.count).toBe(4);
+  expect(geometry.strays).toBe(0);
+  expect(geometry.hidden).toBe(0);
 });

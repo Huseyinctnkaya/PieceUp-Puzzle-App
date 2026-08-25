@@ -1,9 +1,14 @@
 <!doctype html>
 <html>
   <body>
-    <div id="pieceup-root" data-trigger-page="ALL"></div>
-    <link rel="stylesheet" href="../../assets/widget.css" />
-    <link rel="stylesheet" href="../../assets/pieceup-app.css" />
+    <!-- Mirrors blocks/puzzle-embed.liquid: no stylesheet links on the page
+         itself, because the widget loads them inside its own shadow root. -->
+    <div
+      id="pieceup-root"
+      data-trigger-page="ALL"
+      data-widget-styles="../../assets/widget.css"
+      data-puzzle-styles="../../assets/pieceup-app.css"
+    ></div>
     <script type="module">
       import { initPieceUp } from "../../assets/widget.js";
       window.__initPieceUp = initPieceUp;

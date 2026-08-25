@@ -18,7 +18,12 @@ export async function initPieceUp(root) {
 
   const identityKey = getIdentityKey(root);
   const alreadyPlayed = await fetchStatus(identityKey);
-  const popup = buildPopup(root, config, alreadyPlayed, identityKey);
+  const popup = buildPopup(
+    createHost(root),
+    config,
+    alreadyPlayed,
+    identityKey,
+  );
 
   if (config.triggerMode === "AUTO" || config.triggerMode === "BOTH") {
     setTimeout(() => popup.open(), (config.triggerDelaySeconds || 0) * 1000);
@@ -26,6 +31,37 @@ export async function initPieceUp(root) {
   if (config.triggerMode === "BUTTON" || config.triggerMode === "BOTH") {
     popup.mountTriggerButton();
   }
+}
+
+/**
+ * Builds a shadow root to render into, with our stylesheets inside it.
+ *
+ * The widget renders on a page whose CSS belongs to the merchant, and a theme
+ * that restyles something as ordinary as a div can break the puzzle in ways
+ * that never show up in our own tests. This has happened repeatedly: the pieces
+ * are positioned absolutely inside their stage, so a theme rule that takes
+ * `position` off an ancestor sends every one of them somewhere off the popup,
+ * leaving the tray looking empty with nothing on screen to explain it.
+ *
+ * A shadow root ends the whole class of problem: page styles do not cross into
+ * it, and ours do not leak out onto the storefront. Falling back to the host
+ * element keeps very old browsers rendering something rather than nothing.
+ */
+function createHost(root) {
+  if (typeof root.attachShadow !== "function") return root;
+
+  const shadow = root.shadowRoot || root.attachShadow({ mode: "open" });
+  // Stylesheets are linked rather than inlined so the browser caches them the
+  // way it does for the rest of the theme's assets. The URLs come from Liquid,
+  // which is the only place that can resolve a theme asset to its CDN address.
+  for (const url of [root.dataset.widgetStyles, root.dataset.puzzleStyles]) {
+    if (!url) continue;
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = url;
+    shadow.appendChild(link);
+  }
+  return shadow;
 }
 
 function buildPopup(root, config, alreadyPlayed, identityKey) {

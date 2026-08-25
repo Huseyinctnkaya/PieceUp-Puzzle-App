@@ -41,6 +41,11 @@ beforeEach(async () => {
   ({ initPieceUp } = await import("./widget.js"));
 });
 
+/** Where the widget renders: its own shadow root, out of the theme's reach. */
+function ui(root) {
+  return root.shadowRoot ?? root;
+}
+
 /** The completion callback widget.js handed to the puzzle. */
 function completionCallback() {
   return vi.mocked(app.mountPuzzle).mock.calls[0][2];
@@ -51,18 +56,18 @@ describe("initPieceUp", () => {
     const root = document.getElementById("pieceup-root");
     await initPieceUp(root);
 
-    const button = root.querySelector(".pieceup-trigger");
+    const button = ui(root).querySelector(".pieceup-trigger");
     expect(button).not.toBeNull();
 
     button.click();
-    expect(root.querySelector(".puzzle-kampanya")).not.toBeNull();
+    expect(ui(root).querySelector(".puzzle-kampanya")).not.toBeNull();
     expect(app.mountPuzzle).toHaveBeenCalledOnce();
   });
 
   it("passes the merchant's config through to the puzzle", async () => {
     const root = document.getElementById("pieceup-root");
     await initPieceUp(root);
-    root.querySelector(".pieceup-trigger").click();
+    ui(root).querySelector(".pieceup-trigger").click();
 
     expect(vi.mocked(app.mountPuzzle).mock.calls[0][1]).toMatchObject({
       imageUrl: "https://example.com/img.jpg",
@@ -75,22 +80,22 @@ describe("initPieceUp", () => {
     const root = document.getElementById("pieceup-root");
     await initPieceUp(root);
 
-    root.querySelector(".pieceup-trigger").click();
-    expect(root.querySelector(".pieceup-message")).not.toBeNull();
+    ui(root).querySelector(".pieceup-trigger").click();
+    expect(ui(root).querySelector(".pieceup-message")).not.toBeNull();
     expect(app.mountPuzzle).not.toHaveBeenCalled();
   });
 
   it("hands the reward code to the puzzle's own panel", async () => {
     const root = document.getElementById("pieceup-root");
     await initPieceUp(root);
-    root.querySelector(".pieceup-trigger").click();
+    ui(root).querySelector(".pieceup-trigger").click();
 
     await completionCallback()();
 
     // Shown in place, over the finished picture, rather than replacing the
     // popup with a bare message.
     expect(handle.setRewardCode).toHaveBeenCalledWith("PIECEUP-TEST");
-    expect(root.querySelector(".pieceup-message")).toBeNull();
+    expect(ui(root).querySelector(".pieceup-message")).toBeNull();
   });
 
   it("explains a spent reward allowance without telling the shopper to retry", async () => {
@@ -99,13 +104,13 @@ describe("initPieceUp", () => {
     );
     const root = document.getElementById("pieceup-root");
     await initPieceUp(root);
-    root.querySelector(".pieceup-trigger").click();
+    ui(root).querySelector(".pieceup-trigger").click();
 
     await completionCallback()();
 
     // The shop ran out of rewards. That isn't the shopper's fault and trying
     // again won't help, so the copy must not suggest it.
-    const message = root.querySelector(".pieceup-message").textContent;
+    const message = ui(root).querySelector(".pieceup-message").textContent;
     expect(message).toContain("out of rewards");
     expect(message).not.toContain("try again");
   });
@@ -114,11 +119,11 @@ describe("initPieceUp", () => {
     vi.mocked(api.submitCompletion).mockRejectedValue(new Error("network"));
     const root = document.getElementById("pieceup-root");
     await initPieceUp(root);
-    root.querySelector(".pieceup-trigger").click();
+    ui(root).querySelector(".pieceup-trigger").click();
 
     await completionCallback()();
 
-    expect(root.querySelector(".pieceup-message").textContent).toContain(
+    expect(ui(root).querySelector(".pieceup-message").textContent).toContain(
       "try again",
     );
   });
@@ -126,20 +131,20 @@ describe("initPieceUp", () => {
   it("closes the popup via the close button", async () => {
     const root = document.getElementById("pieceup-root");
     await initPieceUp(root);
-    root.querySelector(".pieceup-trigger").click();
+    ui(root).querySelector(".pieceup-trigger").click();
 
-    const overlay = root.querySelector(".pieceup-overlay");
+    const overlay = ui(root).querySelector(".pieceup-overlay");
     expect(overlay.hidden).toBe(false);
-    root.querySelector(".pieceup-close").click();
+    ui(root).querySelector(".pieceup-close").click();
     expect(overlay.hidden).toBe(true);
   });
 
   it("closes on Escape, and does nothing on Escape while already closed", async () => {
     const root = document.getElementById("pieceup-root");
     await initPieceUp(root);
-    root.querySelector(".pieceup-trigger").click();
+    ui(root).querySelector(".pieceup-trigger").click();
 
-    const overlay = root.querySelector(".pieceup-overlay");
+    const overlay = ui(root).querySelector(".pieceup-overlay");
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
     expect(overlay.hidden).toBe(true);
 
