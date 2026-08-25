@@ -13,6 +13,9 @@ widget/src/sub-components
 widget/src/lib
 widget/src/global-types.ts
 
-# Build output of extensions/pieceup-widget/build.mjs.
+# Build output of widget/build.mjs, written to both the theme extension's
+# assets and the app's public/ (the admin preview loads it from there).
 extensions/pieceup-widget/assets/pieceup-app.js
 extensions/pieceup-widget/assets/pieceup-app.css
+public/pieceup-app.js
+public/pieceup-app.css

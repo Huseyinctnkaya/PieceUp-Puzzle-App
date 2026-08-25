@@ -10,6 +10,7 @@
  * is what lets its source be used unmodified.
  */
 import { build } from "esbuild";
+import { copyFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 
@@ -38,3 +39,13 @@ await build({
   loader: { ".css": "css" },
   logLevel: "info",
 });
+
+// The admin's preview runs this same bundle rather than drawing its own
+// approximation of the puzzle, so it needs a copy it can load. It cannot read
+// the extension's: `shopify app dev` claims the /extensions/* path for the
+// theme extension's own asset server. Served from the app's public/ instead.
+const assets = resolve(here, "../extensions/pieceup-widget/assets");
+const publicDir = resolve(here, "../public");
+for (const file of ["pieceup-app.js", "pieceup-app.css"]) {
+  await copyFile(resolve(assets, file), resolve(publicDir, file));
+}

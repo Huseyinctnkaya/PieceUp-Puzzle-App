@@ -593,12 +593,29 @@ export default function PuzzleEdit() {
                 <s-stack gap="base">
                   <s-text color="subdued">
                     This is how the puzzle will look in your store. The preview
-                    updates as you change the image, piece count or knob size.
+                    opens exactly what a shopper sees, with the settings you have here.
                   </s-text>
                   <PuzzlePreview
-                    imageUrl={form.imageUrl}
-                    pieceCount={Number(form.pieceCount)}
-                    knobSize={Number(form.knobSize)}
+                    settings={{
+                      imageUrl: form.imageUrl,
+                      pieceCount: Number(form.pieceCount),
+                      knobSize: Number(form.knobSize),
+                      difficulty: form.difficulty,
+                      trayPosition: form.trayPosition,
+                      accentColor: form.accentColor,
+                      showGuide: form.showGuide === "true",
+                      wrongPieceBehaviour: form.wrongPieceBehaviour,
+                      timeLimitSeconds: form.timeLimitSeconds
+                        ? Number(form.timeLimitSeconds)
+                        : null,
+                      shuffleLimit: Number(form.shuffleLimit),
+                      showMoves: form.showMoves === "true",
+                      rememberProgress: form.rememberProgress === "true",
+                      confetti: form.confetti === "true",
+                      badgeLabel: form.badgeLabel,
+                      headline: form.headline,
+                      description: form.description,
+                    }}
                   />
                 </s-stack>
               </s-section>
