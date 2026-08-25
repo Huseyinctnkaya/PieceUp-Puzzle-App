@@ -33,6 +33,8 @@ export type PieceUpConfig = {
   trayPosition?: "right" | "left" | "bottom" | null;
   timeLimitSeconds?: number | null;
   shuffleLimit?: number | null;
+  /** Whether the shopper may play another round once this one is done. */
+  canReplay?: boolean | null;
   giftStep?: boolean | null;
   giftBoxMode?: boolean | null;
   gifts?: PieceUpGift[] | null;
@@ -115,6 +117,7 @@ export function mountPuzzle(
   const props: Props & {
     onTamamlandi?: () => void;
     onHediyeSecildi?: (giftIndex: number) => void;
+    yarimIlerlemeyiHatirla?: boolean;
   } = {
     ustEtiket: config.badgeLabel ?? undefined,
     baslik: config.headline ?? "",
@@ -132,7 +135,14 @@ export function mountPuzzle(
     sureSaniye: config.timeLimitSeconds ?? 120,
     hamleSayaciniGoster: true,
     ilerlemeyiHatirla: config.rememberProgress ?? true,
-    tekrarOynanabilir: false,
+    // A won reward is worth coming back to — closing the popup should not cost
+    // a shopper their code. A half-dragged puzzle is not: reopening on a
+    // scatter you half remember is more confusing than starting over.
+    yarimIlerlemeyiHatirla: false,
+    // Without this an unlimited puzzle traps the shopper on the reward panel:
+    // the finished round is restored every time they open it, and there is no
+    // way back to a fresh one.
+    tekrarOynanabilir: config.canReplay ?? false,
     konfetiEfekti: true,
     hediyeAdimiAktif: config.giftStep ?? false,
     hediyeKutuModu: config.giftBoxMode ?? false,

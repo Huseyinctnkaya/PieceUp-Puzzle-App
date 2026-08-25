@@ -145,3 +145,95 @@ test("fits the popup without scrolling once the prizes are showing", async ({
   expect(layout.scrolls).toBe(false);
   expect(layout.spaceAbove).toBeLessThan(110);
 });
+
+/** Puts a saved round in storage before the page loads. */
+async function withSavedRound(
+  page: import("@playwright/test").Page,
+  saved: { yerlesenler: number[]; tamamlandi: boolean },
+) {
+  await page.addInitScript(
+    ({ image, round }) => {
+      localStorage.setItem(
+        `ikas-puzzle:${image}:2x2`,
+        JSON.stringify({ tur: 0, hamle: round.yerlesenler.length, ...round }),
+      );
+    },
+    { image: IMAGE, round: saved },
+  );
+}
+
+test("starts a half-finished puzzle over rather than resuming it", async ({
+  page,
+}) => {
+  await serveConfig(page, { pieceCount: 4 });
+  await withSavedRound(page, { yerlesenler: [0, 1], tamamlandi: false });
+
+  await page.goto(fixtureUrl);
+  await page.click(".pieceup-trigger");
+
+  // Reopening onto a scatter you half remember is harder to pick up than a
+  // fresh board, and there is nothing won to protect.
+  await expect(page.locator(".ortu .ana-buton")).toBeVisible();
+  await expect(page.locator(".ilerleme-yazisi")).toHaveText("0 / 4");
+});
+
+test("brings a shopper back to the reward they already won", async ({
+  page,
+}) => {
+  await serveConfig(page, {
+    pieceCount: 4,
+    giftStep: true,
+    giftBoxMode: true,
+    gifts: [{ title: "20% off", awardsPrize: true }],
+  });
+  await withSavedRound(page, {
+    yerlesenler: [0, 1, 2, 3],
+    tamamlandi: true,
+  });
+
+  await page.goto(fixtureUrl);
+  await page.click(".pieceup-trigger");
+
+  // Closing the popup must not cost someone the code they won.
+  await expect(page.locator(".hediye-karti")).toHaveCount(1);
+  await expect(page.locator(".ortu .ana-buton")).toHaveCount(0);
+});
+
+test("offers another round when the puzzle has no play limit", async ({
+  page,
+}) => {
+  await serveConfig(page, {
+    pieceCount: 4,
+    canReplay: true,
+    giftStep: true,
+    giftBoxMode: true,
+    gifts: [{ title: "20% off", awardsPrize: true }],
+  });
+  await withSavedRound(page, { yerlesenler: [0, 1, 2, 3], tamamlandi: true });
+
+  await page.goto(fixtureUrl);
+  await page.click(".pieceup-trigger");
+
+  // Without this an unlimited puzzle is unlimited in name only: the finished
+  // round comes back every time and there is no way to a fresh one.
+  await expect(page.locator(".ikincil-buton")).toHaveCount(1);
+});
+
+test("offers no second round when a shopper only gets one", async ({
+  page,
+}) => {
+  await serveConfig(page, {
+    pieceCount: 4,
+    canReplay: false,
+    giftStep: true,
+    giftBoxMode: true,
+    gifts: [{ title: "20% off", awardsPrize: true }],
+  });
+  await withSavedRound(page, { yerlesenler: [0, 1, 2, 3], tamamlandi: true });
+
+  await page.goto(fixtureUrl);
+  await page.click(".pieceup-trigger");
+
+  // Offering a round the server will refuse is worse than not offering one.
+  await expect(page.locator(".ikincil-buton")).toHaveCount(0);
+});

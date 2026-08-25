@@ -178,6 +178,16 @@ export function PuzzleKampanya(props: Props) {
       setDurum("tamamlandi");
       return;
     }
+    // PieceUp eklemesi: host yarım turu geri yüklemeyi kapatabilir. Kazanılan
+    // ödülü geri getirmek değerli, yarım kalmış bir sürükleme durumunu değil —
+    // kapatıp dönen için baştan başlamak daha anlaşılır. Referansta yok.
+    if (
+      (props as { yarimIlerlemeyiHatirla?: boolean }).yarimIlerlemeyiHatirla ===
+      false
+    ) {
+      durumuSil(kaydetmeAnahtari);
+      return;
+    }
     // Geri sayımlı oyunda yarım ilerleme geri yüklenmez: sayaç ancak kullanıcı
     // "başlat" dediğinde işlemeli, sayfa açılır açılmaz değil.
     if (sureLimitiAktif) return;

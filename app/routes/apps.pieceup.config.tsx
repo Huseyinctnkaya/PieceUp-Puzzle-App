@@ -40,6 +40,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
           // server's business, and a shopper can read the page's source.
           awardsPrize: gift.discountType !== "NONE",
         })),
+        // Whether the shopper may go again, so the reward panel can offer it.
+        // Sent as the answer rather than the rule: the storefront has no
+        // business knowing how the limit is counted, only whether it is spent.
+        canReplay: config.playLimitType === "UNLIMITED",
         triggerMode: config.triggerMode,
         triggerPage: config.triggerPage,
         triggerDelaySeconds: config.triggerDelaySeconds,
