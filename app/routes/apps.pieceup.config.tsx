@@ -2,9 +2,10 @@ import type { LoaderFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import { JSON_NO_STORE } from "./apps.pieceup.headers";
 import { getPuzzleForShopper } from "../services/storefrontPuzzle.server";
+import { getCachedPlan } from "../services/planCache.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  const { session } = await authenticate.public.appProxy(request);
+  const { session, admin } = await authenticate.public.appProxy(request);
   // Carries the shopper's identity so an A/B test can resolve their variant.
   // Absent for an older widget cached by a theme, which simply gets the shop's
   // active puzzle and sits outside the experiment.
@@ -19,6 +20,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
       headers: JSON_NO_STORE,
     });
   }
+
+  // Cached, because this endpoint runs on every storefront page view and the
+  // answer changes at most monthly. Null means the plan could not be read, and
+  // is deliberately not treated as Free: a transient API error must not put
+  // our badge on a paying merchant's shop.
+  const plan = admin ? await getCachedPlan(session.shop, admin) : null;
 
   return new Response(
     JSON.stringify({
@@ -54,6 +61,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
         triggerMode: config.triggerMode,
         triggerPage: config.triggerPage,
         triggerDelaySeconds: config.triggerDelaySeconds,
+        // Free shops carry a small PieceUp line under the puzzle; removing it
+        // is part of what the paid plans sell. `?? false` so an unreadable
+        // plan hides the badge rather than showing it: wrongly branding a
+        // paying merchant's storefront is a defect they will notice, wrongly
+        // sparing a free shop costs us a little promotion.
+        showBranding: plan?.showsBranding ?? false,
       },
     }),
     { status: 200, headers: JSON_NO_STORE },

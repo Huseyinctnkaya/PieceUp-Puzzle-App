@@ -159,6 +159,18 @@ function buildPopup(root, config, alreadyPlayed, identityKey) {
   content.className = "pieceup-content";
   popupBox.appendChild(content);
 
+  // Free shops carry a small line under the puzzle; the paid plans sell its
+  // removal. Rendered only when the server explicitly says so — an older
+  // widget, or a config that could not read the plan, sends nothing, and
+  // silence has to mean no badge rather than a badge on a shop that never
+  // agreed to one.
+  if (config.showBranding === true) {
+    const branding = document.createElement("div");
+    branding.className = "pieceup-branding";
+    branding.textContent = "Powered by PieceUp";
+    popupBox.appendChild(branding);
+  }
+
   function close() {
     overlay.hidden = true;
     // A hidden component would keep all of its in-memory piece positions. A

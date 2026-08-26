@@ -310,3 +310,38 @@ test("offers no second round when a shopper only gets one", async ({
   // Offering a round the server will refuse is worse than not offering one.
   await expect(page.locator(".ikincil-buton")).toHaveCount(0);
 });
+
+test("wears the PieceUp badge on a free shop", async ({ page }) => {
+  await serveConfig(page, { showBranding: true });
+
+  await page.goto(fixtureUrl);
+  await page.click(".pieceup-trigger");
+
+  await expect(page.locator(".pieceup-branding")).toBeVisible();
+  await expect(page.locator(".pieceup-branding")).toContainText("PieceUp");
+});
+
+test("shows no badge on a paid shop", async ({ page }) => {
+  // Removing it is part of what the paid plans sell, so this is the assertion
+  // that the merchant got what they paid for.
+  await serveConfig(page, { showBranding: false });
+
+  await page.goto(fixtureUrl);
+  await page.click(".pieceup-trigger");
+
+  await expect(page.locator(".pieceup-branding")).toHaveCount(0);
+});
+
+test("shows no badge when the config says nothing about it", async ({
+  page,
+}) => {
+  // An older widget, or a config request that predates the field. Silence
+  // must mean no badge: branding a shop that never agreed to it is worse
+  // than missing one that would have carried it.
+  await serveConfig(page);
+
+  await page.goto(fixtureUrl);
+  await page.click(".pieceup-trigger");
+
+  await expect(page.locator(".pieceup-branding")).toHaveCount(0);
+});
