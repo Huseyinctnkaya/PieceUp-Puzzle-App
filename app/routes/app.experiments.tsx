@@ -26,7 +26,15 @@ export async function loader({ request }: LoaderFunctionArgs) {
   // per variant, and a shop with that traffic passes Pro's reward allowance
   // anyway — so the gate lands on the shops that can actually use it.
   if (!plan.hasABTesting) {
-    return { locked: true as const, planTitle: plan.title };
+    // A shop that downgraded mid-test still gets to see and stop it. Locking
+    // the page outright would leave the experiment deciding what their
+    // shoppers see, permanently and out of reach.
+    const running = await getRunningExperiment(session.shop);
+    return {
+      locked: true as const,
+      planTitle: plan.title,
+      running: running ? { id: running.id, name: running.name } : null,
+    };
   }
 
   const [puzzles, running, past] = await Promise.all([
@@ -53,14 +61,25 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-  const { session } = await authenticate.admin(request);
+  const { session, admin } = await authenticate.admin(request);
   const form = await request.formData();
   const intent = String(form.get("intent") || "");
 
   try {
+    // Stopping is deliberately ungated. A shop that downgrades mid-test would
+    // otherwise have an experiment running on its storefront with no way to
+    // reach it — the paywall holding their store hostage.
     if (intent === "stop") {
       await stopExperiment(session.shop, String(form.get("id") || ""));
       return { stopped: true };
+    }
+
+    // Checked here and not only in the loader. Hiding the form is not a
+    // control: this action is reachable by anyone who can post to the route,
+    // and a started experiment really does take over the storefront.
+    const { plan } = await getSubscription(admin);
+    if (!plan.hasABTesting) {
+      return { error: "plan_required" };
     }
 
     const splitPercent = Number(form.get("splitPercent") || 50);
@@ -91,6 +110,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   variants_must_differ: "Pick two different puzzles to compare.",
   unknown_puzzle: "That puzzle no longer exists.",
   not_found: "Test not found.",
+  plan_required: "A/B testing is part of the Premium plan.",
   failed: "Couldn’t do that. Please try again.",
 };
 
@@ -247,6 +267,23 @@ export default function Experiments() {
             <s-button variant="primary" href="/app/plan">
               View plans
             </s-button>
+
+            {data.running ? (
+              <>
+                <s-divider></s-divider>
+                <s-text>
+                  “{data.running.name}” is still running and still deciding
+                  what your shoppers see. You can stop it without upgrading.
+                </s-text>
+                <fetcher.Form method="post">
+                  <input type="hidden" name="intent" value="stop" />
+                  <input type="hidden" name="id" value={data.running.id} />
+                  <s-button type="submit" tone="critical">
+                    Stop test
+                  </s-button>
+                </fetcher.Form>
+              </>
+            ) : null}
           </s-stack>
         </s-section>
       </s-page>
