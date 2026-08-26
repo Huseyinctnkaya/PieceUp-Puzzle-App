@@ -5,8 +5,14 @@ import { createReadableStreamFromReadable } from "@react-router/node";
 import { type EntryContext } from "react-router";
 import { isbot } from "isbot";
 import { addDocumentResponseHeaders } from "./shopify.server";
+import { startRetentionSweep } from "./services/retention.server";
 
 export const streamTimeout = 5000;
+
+// Started here because this module is loaded once when the server boots, and
+// only on the server. The sweep guards itself against being started twice, so
+// a hot reload in development does not stack up timers.
+startRetentionSweep();
 
 export default async function handleRequest(
   request: Request,

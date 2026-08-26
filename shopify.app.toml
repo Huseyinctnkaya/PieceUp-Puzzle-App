@@ -79,6 +79,26 @@ api_version = "2026-10"
   uri = "/webhooks/orders/cancelled"
   topics = [ "orders/cancelled" ]
 
+  # The three privacy webhooks Shopify requires of every public app. Not
+  # optional and not tied to the orders scopes — an app that stores anything
+  # about a shopper has to be able to say what it holds and to erase it.
+  #
+  # Declared with `compliance_topics`, not `topics`. They are the same three
+  # strings either way, and `shopify app config validate` accepts both, but
+  # only this key registers them: as ordinary topics the server rejects them
+  # outright with "The following topic is invalid".
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/customers/data_request"
+  compliance_topics = [ "customers/data_request" ]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/customers/redact"
+  compliance_topics = [ "customers/redact" ]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/shop/redact"
+  compliance_topics = [ "shop/redact" ]
+
 [auth]
 redirect_urls = [ "https://example.com/api/auth" ]
 
