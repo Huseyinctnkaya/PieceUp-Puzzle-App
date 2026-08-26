@@ -27,6 +27,15 @@ export type Plan = {
   puzzleLimit: number | null;
   showsBranding: boolean;
   hasAnalytics: boolean;
+  /**
+   * Whether the shop may run A/B tests.
+   *
+   * Premium only, and not merely to give the tier something to sell: a test
+   * needs at least a hundred visitors per variant before it will name a
+   * winner, and a shop with that traffic passes Pro's monthly reward
+   * allowance anyway. The gate lands on the shops that can actually use it.
+   */
+  hasABTesting: boolean;
   features: string[];
 };
 
@@ -40,44 +49,48 @@ export const PLANS: Record<PlanKey, Plan> = {
     puzzleLimit: 1,
     showsBranding: true,
     hasAnalytics: false,
+    hasABTesting: false,
     features: [
-      "Ayda 100 ödül",
+      "100 rewards a month",
       "1 puzzle",
-      "Tüm ödül tipleri",
-      "PieceUp markası görünür",
+      "Every reward type",
+      "PieceUp badge on the popup",
     ],
   },
   pro: {
     key: "pro",
     shopifyName: PAID_PLAN_NAMES.pro,
     title: "Pro",
-    price: 14.99,
+    price: 9.99,
     monthlyRewardLimit: 1000,
     puzzleLimit: null,
     showsBranding: false,
     hasAnalytics: true,
+    hasABTesting: false,
     features: [
-      "Ayda 1.000 ödül",
-      "Sınırsız puzzle",
-      "PieceUp markası kaldırılabilir",
-      "İstatistikler",
+      "1,000 rewards a month",
+      "Unlimited puzzles",
+      "No PieceUp badge",
+      "Analytics, with the revenue each puzzle earned",
     ],
   },
   premium: {
     key: "premium",
     shopifyName: PAID_PLAN_NAMES.premium,
     title: "Premium",
-    price: 39.99,
+    price: 19.99,
     monthlyRewardLimit: null,
     puzzleLimit: null,
     showsBranding: false,
     hasAnalytics: true,
+    hasABTesting: true,
     features: [
-      "Sınırsız ödül",
-      "Sınırsız puzzle",
-      "PieceUp markası kaldırılabilir",
-      "İstatistikler",
-      "Öncelikli destek",
+      "Unlimited rewards",
+      "Unlimited puzzles",
+      "No PieceUp badge",
+      "Analytics, with the revenue each puzzle earned",
+      "A/B testing — run two puzzles and keep the one that earns more",
+      "Priority support",
     ],
   },
 };

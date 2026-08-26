@@ -22,9 +22,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const { session, admin } = await authenticate.admin(request);
   const { plan } = await getSubscription(admin);
 
-  // Same gate as the analytics page: an experiment is only worth running if
-  // its results can be read.
-  if (!plan.hasAnalytics) {
+  // Premium, not merely Pro. A test names no winner below a hundred visitors
+  // per variant, and a shop with that traffic passes Pro's reward allowance
+  // anyway — so the gate lands on the shops that can actually use it.
+  if (!plan.hasABTesting) {
     return { locked: true as const, planTitle: plan.title };
   }
 
@@ -238,7 +239,7 @@ export default function Experiments() {
       <s-page heading="A/B tests">
         <s-section>
           <s-stack gap="base" alignItems="start">
-            <s-heading>A/B testing is part of the Pro plan</s-heading>
+            <s-heading>A/B testing is part of the Premium plan</s-heading>
             <s-text color="subdued">
               You’re on the {data.planTitle} plan. Upgrade to run two puzzles
               side by side and find out which one earns more.
