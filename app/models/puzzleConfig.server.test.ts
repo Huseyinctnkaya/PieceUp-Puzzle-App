@@ -30,6 +30,7 @@ let deletePuzzleConfig: typeof import("./puzzleConfig.server").deletePuzzleConfi
 let getActivePuzzleConfig: typeof import("./puzzleConfig.server").getActivePuzzleConfig;
 let AlreadyActiveError: typeof import("./puzzleConfig.server").AlreadyActiveError;
 let PuzzleIsActiveError: typeof import("./puzzleConfig.server").PuzzleIsActiveError;
+let PuzzleInExperimentError: typeof import("./puzzleConfig.server").PuzzleInExperimentError;
 let NotFoundError: typeof import("./puzzleConfig.server").NotFoundError;
 let PuzzleLimitReachedError: typeof import("./puzzleConfig.server").PuzzleLimitReachedError;
 
@@ -45,6 +46,7 @@ beforeAll(async () => {
     getActivePuzzleConfig,
     AlreadyActiveError,
     PuzzleIsActiveError,
+    PuzzleInExperimentError,
     NotFoundError,
     PuzzleLimitReachedError,
   } = await import("./puzzleConfig.server"));
@@ -55,6 +57,9 @@ afterAll(() => {
 });
 
 beforeEach(async () => {
+  // Experiments first: they reference puzzles, and one left running would
+  // make the delete guard fire in a later test that never asked for it.
+  await db.experiment.deleteMany();
   await db.puzzleConfig.deleteMany();
 });
 
@@ -300,6 +305,45 @@ describe("deletePuzzleConfig", () => {
     expect(
       await getPuzzleConfigById("shop-h.myshopify.com", created.id),
     ).not.toBeNull();
+  });
+
+  it("refuses to delete a puzzle that is in a running A/B test", async () => {
+    // A variant deleted mid-test leaves half the shoppers with no puzzle at
+    // all, and the experiment measuring against nothing.
+    const shop = "shop-exp-delete.myshopify.com";
+    const { startExperiment } = await import("./experiment.server");
+    const a = await createPuzzleConfig(shop, { ...baseInput, isActive: false });
+    const b = await createPuzzleConfig(shop, { ...baseInput, isActive: false });
+    await startExperiment(shop, {
+      name: "Test",
+      variantAId: a.id,
+      variantBId: b.id,
+      splitPercent: 50,
+    });
+
+    await expect(deletePuzzleConfig(shop, a.id)).rejects.toThrow(
+      PuzzleInExperimentError,
+    );
+    expect(await getPuzzleConfigById(shop, a.id)).not.toBeNull();
+  });
+
+  it("allows the delete once the test has stopped", async () => {
+    const shop = "shop-exp-delete2.myshopify.com";
+    const { startExperiment, stopExperiment } = await import(
+      "./experiment.server"
+    );
+    const a = await createPuzzleConfig(shop, { ...baseInput, isActive: false });
+    const b = await createPuzzleConfig(shop, { ...baseInput, isActive: false });
+    const experiment = await startExperiment(shop, {
+      name: "Test",
+      variantAId: a.id,
+      variantBId: b.id,
+      splitPercent: 50,
+    });
+    await stopExperiment(shop, experiment.id);
+
+    await deletePuzzleConfig(shop, a.id);
+    expect(await getPuzzleConfigById(shop, a.id)).toBeNull();
   });
 });
 
