@@ -13,7 +13,11 @@ type ConfigOverrides = Record<string, unknown>;
 
 /** Loads the widget with a given config, without opening the popup. */
 async function setUpPuzzle(page: Page, overrides: ConfigOverrides = {}) {
-  await page.route("**/apps/pieceup/config", (route) =>
+  // The trailing star matters: fetchConfig() appends ?identityKey=... so the
+  // A/B test can resolve the variant, and a pattern without it stops matching.
+  // The request then reaches the static server, 404s, and the widget mounts
+  // nothing at all — which surfaces as every locator in the file timing out.
+  await page.route("**/apps/pieceup/config*", (route) =>
     route.fulfill({
       json: {
         config: {
@@ -127,7 +131,7 @@ test("shows the merchant's copy above the card", async ({ page }) => {
 });
 
 test("tells a returning shopper they've already played", async ({ page }) => {
-  await page.route("**/apps/pieceup/config", (route) =>
+  await page.route("**/apps/pieceup/config*", (route) =>
     route.fulfill({
       json: {
         config: {
