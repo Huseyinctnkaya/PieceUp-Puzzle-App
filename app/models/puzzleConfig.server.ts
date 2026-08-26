@@ -1,4 +1,5 @@
 import db from "../db.server";
+import { isPuzzleInRunningExperiment } from "./experiment.server";
 
 export type PuzzleGiftInput = {
   title: string;
@@ -60,6 +61,12 @@ export class AlreadyActiveError extends Error {
 export class PuzzleIsActiveError extends Error {
   constructor() {
     super("cannot_delete_active_puzzle");
+  }
+}
+
+export class PuzzleInExperimentError extends Error {
+  constructor() {
+    super("cannot_delete_puzzle_in_experiment");
   }
 }
 
@@ -182,6 +189,11 @@ export async function deletePuzzleConfig(shopDomain: string, id: string) {
   }
   if (config.isActive) {
     throw new PuzzleIsActiveError();
+  }
+  // A variant deleted mid-test leaves half the shoppers with no puzzle at all
+  // and the experiment comparing against nothing.
+  if (await isPuzzleInRunningExperiment(shopDomain, id)) {
+    throw new PuzzleInExperimentError();
   }
   await db.puzzleConfig.delete({ where: { id } });
 }

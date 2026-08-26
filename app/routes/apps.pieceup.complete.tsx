@@ -1,6 +1,6 @@
 import type { ActionFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
-import { getActivePuzzleConfig } from "../models/puzzleConfig.server";
+import { getPuzzleForShopper } from "../services/storefrontPuzzle.server";
 import {
   countRewardsThisMonth,
   hasAlreadyPlayed,
@@ -51,7 +51,10 @@ export async function action({ request }: ActionFunctionArgs) {
     });
   }
 
-  const config = await getActivePuzzleConfig(session.shop);
+  // The same resolver the config request used, given the same identity, so the
+  // prize comes from the puzzle this shopper actually played rather than
+  // whichever one happens to be active.
+  const config = await getPuzzleForShopper(session.shop, identityKey);
   if (!config) {
     return new Response(JSON.stringify({ error: "no_active_puzzle" }), {
       status: 404,

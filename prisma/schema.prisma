@@ -171,6 +171,37 @@ model PlayRecord {
   @@unique([shopDomain, identityKey, limitKey])
 }
 
+/// Two puzzles run side by side to find out which one earns more.
+///
+/// While an experiment is running it is the storefront's authority, ahead of
+/// `PuzzleConfig.isActive` — the variants are chosen here, so neither has to be
+/// the shop's single active puzzle, and the one-active-puzzle rule is left
+/// alone rather than punctured.
+///
+/// No per-visitor rows. Which variant a shopper sees is recomputed from a hash
+/// of their identity every request, so assignment is consistent without the app
+/// keeping a record of who saw what.
+model Experiment {
+  id           String    @id @default(cuid())
+  shopDomain   String
+  name         String
+  /// The two PuzzleConfigs under test. Plain ids rather than relations,
+  /// matching how PuzzleStat and AttributedOrder refer to a puzzle; the guards
+  /// against deleting a puzzle mid-experiment live in the model layer.
+  variantAId   String
+  variantBId   String
+  /// Share of shoppers sent to variant A, 0-100.
+  splitPercent Int       @default(50)
+  /// RUNNING or STOPPED. A stopped experiment keeps its dates so its results
+  /// stay readable afterwards.
+  status       String    @default("RUNNING")
+  startedAt    DateTime  @default(now())
+  stoppedAt    DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([shopDomain, status])
+}
+
 /// An order a shopper placed with a PieceUp reward code.
 ///
 /// This is what turns "we handed out 300 codes" into "the campaign earned you

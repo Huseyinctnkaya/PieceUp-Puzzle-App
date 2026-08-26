@@ -1,7 +1,18 @@
 const PROXY_BASE = "/apps/pieceup";
 
-export async function fetchConfig() {
-  const res = await fetch(`${PROXY_BASE}/config`);
+/**
+ * Fetches the puzzle this shopper should see.
+ *
+ * The identity travels with the request because an A/B test picks the variant
+ * from it. Every other call that resolves a puzzle — the open counter, the
+ * completion — sends the same value, so all three agree on which of the two
+ * puzzles this shopper is playing.
+ */
+export async function fetchConfig(identityKey) {
+  const query = identityKey
+    ? `?identityKey=${encodeURIComponent(identityKey)}`
+    : "";
+  const res = await fetch(`${PROXY_BASE}/config${query}`);
   if (!res.ok) {
     throw new Error("config_fetch_failed");
   }
@@ -32,7 +43,7 @@ const OPEN_TRACKED_KEY = "pieceup_open_tracked";
  * Deliberately fire-and-forget: a failed analytics ping must never stop
  * someone playing.
  */
-export function trackOpen() {
+export function trackOpen(identityKey) {
   try {
     if (sessionStorage.getItem(OPEN_TRACKED_KEY)) return;
     sessionStorage.setItem(OPEN_TRACKED_KEY, "1");
@@ -43,7 +54,9 @@ export function trackOpen() {
   fetch(`${PROXY_BASE}/track`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ event: "opened" }),
+    // The identity picks the A/B variant this open is counted against, so the
+    // open lands on the puzzle the shopper was actually shown.
+    body: JSON.stringify({ event: "opened", identityKey }),
   }).catch(() => {});
 }
 

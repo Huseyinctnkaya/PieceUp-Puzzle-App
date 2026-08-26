@@ -1,10 +1,16 @@
 import type { LoaderFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
-import { getActivePuzzleConfig } from "../models/puzzleConfig.server";
+import { getPuzzleForShopper } from "../services/storefrontPuzzle.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const { session } = await authenticate.public.appProxy(request);
-  const config = session ? await getActivePuzzleConfig(session.shop) : null;
+  // Carries the shopper's identity so an A/B test can resolve their variant.
+  // Absent for an older widget cached by a theme, which simply gets the shop's
+  // active puzzle and sits outside the experiment.
+  const identityKey = new URL(request.url).searchParams.get("identityKey");
+  const config = session
+    ? await getPuzzleForShopper(session.shop, identityKey)
+    : null;
 
   if (!config) {
     return new Response(JSON.stringify({ config: null }), {

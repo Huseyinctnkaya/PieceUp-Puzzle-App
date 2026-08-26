@@ -20,7 +20,11 @@ export async function initPieceUp(root) {
 }
 
 async function start(root) {
-  const config = await fetchConfig();
+  // Resolved before the config request, which needs it: with an A/B test
+  // running, the identity is what decides which of the two puzzles comes back.
+  const identityKey = getIdentityKey(root);
+
+  const config = await fetchConfig(identityKey);
   if (!config) return;
   if (
     config.triggerPage !== "ALL" &&
@@ -28,7 +32,6 @@ async function start(root) {
   )
     return;
 
-  const identityKey = getIdentityKey(root);
   const popup = buildPopup(
     createHost(root),
     config,
@@ -168,7 +171,7 @@ function buildPopup(root, config, alreadyPlayed, identityKey) {
 
   async function open() {
     overlay.hidden = false;
-    trackOpen();
+    trackOpen(identityKey);
     if (playSpent) {
       renderMessage(content, "You've already played — thanks!");
       return;

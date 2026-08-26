@@ -1,6 +1,6 @@
 import type { ActionFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
-import { getActivePuzzleConfig } from "../models/puzzleConfig.server";
+import { getPuzzleForShopper } from "../services/storefrontPuzzle.server";
 import { recordStat } from "../models/puzzleStat.server";
 
 /**
@@ -30,8 +30,15 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   // Resolved server-side rather than taken from the request body, so a client
-  // can't attribute opens to a puzzle that isn't the live one.
-  const config = await getActivePuzzleConfig(session.shop);
+  // can't attribute opens to a puzzle that isn't the live one. The identity is
+  // read from the body only to pick the shopper's A/B variant — it decides
+  // which of two puzzles the open is counted against, never whether to count
+  // it — and it must be the same identity the config request used, or the open
+  // would land on the variant the shopper was not shown.
+  const body = await request.json().catch(() => ({}));
+  const identityKey =
+    typeof body.identityKey === "string" ? body.identityKey : null;
+  const config = await getPuzzleForShopper(session.shop, identityKey);
   if (!config) {
     return new Response(JSON.stringify({ ok: true }), {
       status: 200,
