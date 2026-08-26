@@ -1,5 +1,6 @@
 import type { LoaderFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
+import { JSON_NO_STORE } from "./apps.pieceup.headers";
 import { getPuzzleForShopper } from "../services/storefrontPuzzle.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -15,7 +16,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   if (!config) {
     return new Response(JSON.stringify({ config: null }), {
       status: 200,
-      headers: { "Content-Type": "application/json" },
+      headers: JSON_NO_STORE,
     });
   }
 
@@ -55,6 +56,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
         triggerDelaySeconds: config.triggerDelaySeconds,
       },
     }),
-    { status: 200, headers: { "Content-Type": "application/json" } },
+    { status: 200, headers: JSON_NO_STORE },
   );
 }

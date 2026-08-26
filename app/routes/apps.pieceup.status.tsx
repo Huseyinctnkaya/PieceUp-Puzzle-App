@@ -1,5 +1,6 @@
 import type { LoaderFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
+import { JSON_NO_STORE } from "./apps.pieceup.headers";
 import { getActivePuzzleConfig } from "../models/puzzleConfig.server";
 import {
   hasAlreadyPlayed,
@@ -14,7 +15,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   if (!session || !identityKey) {
     return new Response(JSON.stringify({ alreadyPlayed: true }), {
       status: 200,
-      headers: { "Content-Type": "application/json" },
+      headers: JSON_NO_STORE,
     });
   }
 
@@ -22,7 +23,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   if (!config) {
     return new Response(JSON.stringify({ alreadyPlayed: true }), {
       status: 200,
-      headers: { "Content-Type": "application/json" },
+      headers: JSON_NO_STORE,
     });
   }
 
@@ -34,6 +35,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   return new Response(JSON.stringify({ alreadyPlayed }), {
     status: 200,
-    headers: { "Content-Type": "application/json" },
+    headers: JSON_NO_STORE,
   });
 }
