@@ -47,6 +47,16 @@ export type RewardConfig = {
 /** How long a won code stays usable. */
 const VALID_FOR_DAYS = 7;
 
+/**
+ * What marks a discount code as PieceUp's own.
+ *
+ * Exported because it is a contract, not a detail: order attribution finds our
+ * codes on an order by this prefix, and the redemption count asks Shopify for
+ * discounts whose title starts with it. All three have to agree, so they read
+ * it from here rather than each spelling it out.
+ */
+export const REWARD_CODE_PREFIX = "PIECEUP-";
+
 function randomCode(prefix: string): string {
   // No I, O, 0 or 1: the code gets read off a screen and typed at checkout.
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -54,7 +64,7 @@ function randomCode(prefix: string): string {
   for (let i = 0; i < 12; i++) {
     suffix += chars[randomInt(chars.length)];
   }
-  return `${prefix}-${suffix}`;
+  return `${prefix}${suffix}`;
 }
 
 /** Which items the discount applies to, from the merchant's selection. */
@@ -126,7 +136,7 @@ export async function issueRewardCode(
 ): Promise<string | null> {
   if (reward.discountType === "NONE") return null;
 
-  const code = randomCode("PIECEUP");
+  const code = randomCode(REWARD_CODE_PREFIX);
   const now = new Date();
   const endsAt = new Date(
     now.getTime() + VALID_FOR_DAYS * 24 * 60 * 60 * 1000,

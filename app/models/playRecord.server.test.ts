@@ -23,27 +23,76 @@ const TEST_DB_PATH = `./prisma/${TEST_DB_FILENAME}`;
 // and migrated, so the Prisma client binds to the isolated test database.
 let hasAlreadyPlayed: typeof import("./playRecord.server").hasAlreadyPlayed;
 let recordCompletion: typeof import("./playRecord.server").recordCompletion;
+let countRewardsThisMonth: typeof import("./playRecord.server").countRewardsThisMonth;
 
 beforeAll(async () => {
   execSync("npx prisma db push --skip-generate", { stdio: "inherit" });
-  ({ hasAlreadyPlayed, recordCompletion } = await import("./playRecord.server"));
+  ({ hasAlreadyPlayed, recordCompletion, countRewardsThisMonth } = await import(
+    "./playRecord.server"
+  ));
 });
 
 afterAll(() => {
   if (existsSync(TEST_DB_PATH)) unlinkSync(TEST_DB_PATH);
 });
 
+/** A completed play, with only the fields a given test cares about spelled out. */
+function play(
+  overrides: Partial<Parameters<typeof recordCompletion>[0]> = {},
+): Parameters<typeof recordCompletion>[0] {
+  return {
+    shopDomain: "shop-e.myshopify.com",
+    identityKey: "device:xyz",
+    puzzleId: "puzzle-1",
+    discountCode: "PIECEUP-ABC123",
+    prizeTitle: "Prize",
+    ...overrides,
+  };
+}
+
 describe("hasAlreadyPlayed / recordCompletion", () => {
   it("is false before any play, true after recordCompletion (ONCE_EVER)", async () => {
     expect(await hasAlreadyPlayed("shop-e.myshopify.com", "device:xyz", "ONCE_EVER")).toBe(false);
-    await recordCompletion("shop-e.myshopify.com", "device:xyz", "PIECEUP-ABC123", "Prize");
+    await recordCompletion(play());
     expect(await hasAlreadyPlayed("shop-e.myshopify.com", "device:xyz", "ONCE_EVER")).toBe(true);
   });
 
   it("rejects a second recordCompletion for the same identity on the same day", async () => {
-    await recordCompletion("shop-f.myshopify.com", "device:xyz", "PIECEUP-A", "Prize");
+    await recordCompletion(play({ shopDomain: "shop-f.myshopify.com", discountCode: "PIECEUP-A" }));
     await expect(
-      recordCompletion("shop-f.myshopify.com", "device:xyz", "PIECEUP-B", "Prize"),
+      recordCompletion(play({ shopDomain: "shop-f.myshopify.com", discountCode: "PIECEUP-B" })),
     ).rejects.toThrow();
+  });
+
+  it("records which puzzle was played, so revenue can be traced back to it", async () => {
+    await recordCompletion(
+      play({ shopDomain: "shop-p.myshopify.com", puzzleId: "puzzle-42" }),
+    );
+
+    const db = (await import("../db.server")).default;
+    const row = await db.playRecord.findFirst({
+      where: { shopDomain: "shop-p.myshopify.com" },
+    });
+    expect(row?.puzzleId).toBe("puzzle-42");
+  });
+});
+
+describe("countRewardsThisMonth", () => {
+  it("counts a play that was given a code", async () => {
+    const shop = "shop-q1.myshopify.com";
+    await recordCompletion(play({ shopDomain: shop, discountCode: "PIECEUP-Q1" }));
+
+    expect(await countRewardsThisMonth(shop)).toBe(1);
+  });
+
+  it("does not spend the shop's allowance on a prize that awarded nothing", async () => {
+    // A "try again" gift mints no code. It used to be stored as the empty
+    // string, which passes a `not: null` filter — so prizes worth nothing were
+    // eating a Free shop's 100 monthly rewards. Null is the honest value and
+    // the only one the count excludes.
+    const shop = "shop-q2.myshopify.com";
+    await recordCompletion(play({ shopDomain: shop, discountCode: null }));
+
+    expect(await countRewardsThisMonth(shop)).toBe(0);
   });
 });

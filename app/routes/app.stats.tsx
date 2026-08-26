@@ -10,6 +10,10 @@ import {
 } from "../models/puzzleStat.server";
 import { listPuzzleConfigs } from "../models/puzzleConfig.server";
 import { getPrizeWins } from "../models/playRecord.server";
+import {
+  getRevenueByPuzzle,
+  getRevenueTotals,
+} from "../models/attributedOrder.server";
 
 const RANGE_DAYS = 30;
 
@@ -23,15 +27,25 @@ export async function loader({ request }: LoaderFunctionArgs) {
     return { locked: true as const, planTitle: plan.title };
   }
 
-  const [totals, daily, byPuzzle, puzzles, redemptions, prizeWins] =
-    await Promise.all([
-      getFunnelTotals(session.shop),
-      getDailyStats(session.shop, RANGE_DAYS),
-      getTotalsByPuzzle(session.shop),
-      listPuzzleConfigs(session.shop),
-      getRedemptionStats(admin),
-      getPrizeWins(session.shop),
-    ]);
+  const [
+    totals,
+    daily,
+    byPuzzle,
+    puzzles,
+    redemptions,
+    prizeWins,
+    revenue,
+    revenueByPuzzle,
+  ] = await Promise.all([
+    getFunnelTotals(session.shop),
+    getDailyStats(session.shop, RANGE_DAYS),
+    getTotalsByPuzzle(session.shop),
+    listPuzzleConfigs(session.shop),
+    getRedemptionStats(admin),
+    getPrizeWins(session.shop),
+    getRevenueTotals(session.shop),
+    getRevenueByPuzzle(session.shop),
+  ]);
 
   const names = new Map(puzzles.map((puzzle) => [puzzle.id, puzzle.name]));
 
@@ -41,6 +55,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     prizeWins,
     daily,
     redemptions,
+    revenue,
     rangeDays: RANGE_DAYS,
     perPuzzle: byPuzzle
       .map((row) => ({
@@ -48,9 +63,26 @@ export async function loader({ request }: LoaderFunctionArgs) {
         // A puzzle can be deleted while its stats remain; showing the row is
         // more useful than dropping history, so it gets a placeholder name.
         name: names.get(row.puzzleId) ?? "Deleted puzzle",
+        revenueCents: revenueByPuzzle.get(row.puzzleId)?.revenueCents ?? 0,
       }))
       .sort((a, b) => b.opened - a.opened),
   };
+}
+
+/**
+ * Formats minor units as money in the shop's currency.
+ *
+ * Falls back to a dash rather than a zero when there is no currency to format
+ * in: a shop with no attributed orders yet has earned nothing *so far*, which
+ * is a different statement from having earned ₺0.00.
+ */
+function money(cents: number, currency: string | null) {
+  if (!currency) return "—";
+  return new Intl.NumberFormat(undefined, {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 0,
+  }).format(cents / 100);
 }
 
 function percent(part: number, whole: number) {
@@ -173,7 +205,8 @@ export default function StatsPage() {
     );
   }
 
-  const { totals, daily, perPuzzle, redemptions, rangeDays, prizeWins } = data;
+  const { totals, daily, perPuzzle, redemptions, rangeDays, prizeWins, revenue } =
+    data;
   // The share is of prizes won, not of plays: a "try again" is a prize too,
   // and leaving it out would make the percentages add up to less than a whole.
   const totalWins = prizeWins.reduce((sum, row) => sum + row.won, 0);
@@ -201,6 +234,49 @@ export default function StatsPage() {
             </s-text>
           </s-banner>
         ) : null}
+
+        <s-section heading="Revenue from PieceUp">
+          <s-stack gap="base">
+            <s-grid
+              gridTemplateColumns="1fr 1fr 1fr"
+              gap="base"
+              alignItems="stretch"
+            >
+              <Metric
+                label="Revenue earned"
+                value={money(revenue.revenueCents, revenue.currency)}
+                hint={
+                  revenue.orders === 0
+                    ? "No reward codes used yet"
+                    : `From ${revenue.orders} ${revenue.orders === 1 ? "order" : "orders"}`
+                }
+              />
+              <Metric
+                label="Orders with a reward"
+                value={String(revenue.orders)}
+                hint={`${percent(revenue.orders, totals.rewarded)} of codes given`}
+              />
+              <Metric
+                label="Average order"
+                value={
+                  revenue.orders === 0
+                    ? "—"
+                    : money(
+                        Math.round(revenue.revenueCents / revenue.orders),
+                        revenue.currency,
+                      )
+                }
+                hint="Across orders that used a code"
+              />
+            </s-grid>
+            <s-text color="subdued">
+              The full value of every order placed with a PieceUp code, minus
+              cancellations. Counted whole rather than only the discounted item:
+              a shopper who came for the reward and filled a basket earned you
+              the basket.
+            </s-text>
+          </s-stack>
+        </s-section>
 
         <s-section heading="Overview">
           <s-grid
@@ -286,6 +362,9 @@ export default function StatsPage() {
                 <s-table-header listSlot="labeled">Opened</s-table-header>
                 <s-table-header listSlot="labeled">Completed</s-table-header>
                 <s-table-header listSlot="labeled">Rewarded</s-table-header>
+                <s-table-header listSlot="labeled" format="currency">
+                  Revenue
+                </s-table-header>
                 <s-table-header listSlot="inline">Conversion</s-table-header>
               </s-table-header-row>
               <s-table-body>
@@ -297,6 +376,11 @@ export default function StatsPage() {
                     <s-table-cell>{String(row.opened)}</s-table-cell>
                     <s-table-cell>{String(row.completed)}</s-table-cell>
                     <s-table-cell>{String(row.rewarded)}</s-table-cell>
+                    <s-table-cell>
+                      {row.revenueCents === 0
+                        ? "—"
+                        : money(row.revenueCents, revenue.currency)}
+                    </s-table-cell>
                     <s-table-cell>
                       <s-badge tone="neutral">
                         {percent(row.completed, row.opened)}

@@ -10,7 +10,16 @@ embedded = true
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "write_products,write_metaobjects,write_metaobject_definitions,write_files,write_discounts"
+#
+# read_orders backs revenue attribution: the app issues discount codes but
+# never sees a checkout, so the orders webhooks are the only way to tell a
+# merchant what their campaign actually earned.
+#
+# It is a protected customer data scope and has to be approved in the Partner
+# Dashboard before it works in production. `read_all_orders` is deliberately
+# not requested — that one exists to read orders older than 60 days, and
+# attribution only ever handles orders arriving live from now on.
+scopes = "write_products,write_metaobjects,write_metaobject_definitions,write_files,write_discounts,read_orders"
 
 [product.metafields.app.demo_info]
 type = "single_line_text_field"
@@ -56,6 +65,19 @@ api_version = "2026-10"
   [[webhooks.subscriptions]]
   uri = "/webhooks/app/scopes_update"
   topics = [ "app/scopes_update" ]
+
+  # Revenue attribution. orders/create rather than orders/paid: cash on
+  # delivery and bank transfer are common in the shops this app targets, and
+  # for those `paid` arrives days later or never — the campaign would look
+  # like it earned nothing. Cancellations are subtracted separately instead,
+  # which keeps the total honest without waiting on payment capture.
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/orders/create"
+  topics = [ "orders/create" ]
+
+  [[webhooks.subscriptions]]
+  uri = "/webhooks/orders/cancelled"
+  topics = [ "orders/cancelled" ]
 
 [auth]
 redirect_urls = [ "https://example.com/api/auth" ]

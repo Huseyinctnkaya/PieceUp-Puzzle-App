@@ -122,13 +122,14 @@ export async function action({ request }: ActionFunctionArgs) {
   try {
     // A "try again" prize still counts as a play: it is how the merchant caps
     // one go per shopper, and the absence of a code does not undo that.
-    await recordCompletion(
-      session.shop,
+    await recordCompletion({
+      shopDomain: session.shop,
       identityKey,
-      code ?? "",
-      gift.title,
-      config.playLimitType as PlayLimitType,
-    );
+      puzzleId: config.id,
+      discountCode: code,
+      prizeTitle: gift.title,
+      playLimitType: config.playLimitType as PlayLimitType,
+    });
   } catch (error) {
     // The Shopify mutation above has already created a real, redeemable code.
     // Turning a local persistence failure into an HTTP error makes the shopper

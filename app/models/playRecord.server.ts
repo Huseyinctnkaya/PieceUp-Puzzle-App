@@ -50,6 +50,10 @@ export async function hasAlreadyPlayed(
  * Rewards handed out this calendar month, used to enforce the plan's monthly
  * allowance. Counts rows that actually carry a discount code, so a play that
  * failed before a code was issued doesn't burn the merchant's quota.
+ *
+ * "Carries a code" means a non-null one. A "try again" prize issues nothing,
+ * and storing the empty string for it — as this once did — made it pass the
+ * `not: null` test below and quietly consume a slot the shop had paid for.
  */
 export async function countRewardsThisMonth(
   shopDomain: string,
@@ -67,22 +71,40 @@ export async function countRewardsThisMonth(
   });
 }
 
-export async function recordCompletion(
-  shopDomain: string,
-  identityKey: string,
-  discountCode: string,
-  prizeTitle: string,
-  playLimitType: PlayLimitType = "ONCE_EVER",
-): Promise<void> {
+export type CompletedPlay = {
+  shopDomain: string;
+  identityKey: string;
+  /** The campaign that was played, so its revenue can be traced back to it. */
+  puzzleId: string;
+  /**
+   * The code the shopper won, or null when the prize was "try again".
+   *
+   * Null rather than an empty string on purpose: the monthly allowance counts
+   * rows with a code, and an empty string counts as one.
+   */
+  discountCode: string | null;
+  prizeTitle: string;
+  playLimitType?: PlayLimitType;
+};
+
+/**
+ * Takes the fields as one object rather than in a row.
+ *
+ * With six of them, four being strings, positional arguments were one
+ * transposition away from filing a play under the wrong shop or prize — and
+ * nothing about the types would have caught it.
+ */
+export async function recordCompletion(play: CompletedPlay): Promise<void> {
   await db.playRecord.create({
     data: {
-      shopDomain,
-      identityKey,
+      shopDomain: play.shopDomain,
+      identityKey: play.identityKey,
+      puzzleId: play.puzzleId,
       playDate: todayDateString(),
-      limitKey: limitKeyFor(playLimitType),
+      limitKey: limitKeyFor(play.playLimitType ?? "ONCE_EVER"),
       completed: true,
-      discountCode,
-      prizeTitle,
+      discountCode: play.discountCode,
+      prizeTitle: play.prizeTitle,
     },
   });
 }

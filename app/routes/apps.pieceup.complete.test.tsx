@@ -289,15 +289,18 @@ describe("apps.pieceup.complete action", () => {
 
     // Without the name the analytics cannot say which prizes shoppers land on,
     // which is the whole question once prizes differ from one another.
-    expect(recordCompletion).toHaveBeenCalledWith(
-      "shop-a.myshopify.com",
-      "device:xyz",
-      "PIECEUP-ABC123",
-      "Free shipping",
+    expect(recordCompletion).toHaveBeenCalledWith({
+      shopDomain: "shop-a.myshopify.com",
+      identityKey: "device:xyz",
+      // Stamped on the play so an order placed with this code later can be
+      // credited back to the campaign that earned it.
+      puzzleId: "puzzle-1",
+      discountCode: "PIECEUP-ABC123",
+      prizeTitle: "Free shipping",
       // The limit travels with the record: it decides what the play is counted
       // against, and the database enforces it from there.
-      "ONCE_EVER",
-    );
+      playLimitType: "ONCE_EVER",
+    });
   });
 
   it("refuses to complete a puzzle with no gifts configured", async () => {

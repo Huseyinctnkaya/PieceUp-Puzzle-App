@@ -10,8 +10,14 @@ beforeEach(async () => {
 
 /** Each play needs its own identity: a shopper only gets one go. */
 let n = 0;
-function play(prize: string, code = "PIECEUP-X") {
-  return recordCompletion(SHOP, `device:${n++}`, code, prize);
+function play(prize: string, code: string | null = "PIECEUP-X") {
+  return recordCompletion({
+    shopDomain: SHOP,
+    identityKey: `device:${n++}`,
+    puzzleId: "puzzle-1",
+    discountCode: code,
+    prizeTitle: prize,
+  });
 }
 
 describe("getPrizeWins", () => {

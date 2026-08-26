@@ -149,6 +149,10 @@ model PlayRecord {
   id           String   @id @default(cuid())
   shopDomain   String
   identityKey  String
+  /// Which puzzle was played. Nullable because rows written before revenue
+  /// attribution existed cannot be assigned one after the fact, and guessing
+  /// would put real money against the wrong campaign.
+  puzzleId     String?
   playDate     String
   /// What the shopper's one go is counted against, so the unique index below
   /// enforces the limit rather than merely describing it: "ever" for one go
@@ -165,4 +169,45 @@ model PlayRecord {
   playedAt     DateTime @default(now())
 
   @@unique([shopDomain, identityKey, limitKey])
+}
+
+/// An order a shopper placed with a PieceUp reward code.
+///
+/// This is what turns "we handed out 300 codes" into "the campaign earned you
+/// ₺47,300", which is the only number that tells a merchant whether the app is
+/// worth its subscription.
+///
+/// Carries no personal data by design. The `orders/create` payload it is built
+/// from is protected customer data — email, name, phone, both addresses — and
+/// none of that is stored here or anywhere else. Attribution needs to know
+/// that an order happened and what it was worth, never who placed it.
+model AttributedOrder {
+  id           String   @id @default(cuid())
+  shopDomain   String
+  /// The order's gid. Deliberately never the numeric id beside it in the
+  /// payload: those exceed JavaScript's safe integer range and JSON.parse
+  /// rounds them, which would let two orders collide on this key.
+  orderId      String
+  discountCode String
+  /// Copied from the PlayRecord this code came from, so a puzzle deleted later
+  /// does not erase the revenue it earned. Null when the code predates
+  /// per-puzzle tracking or no matching play was found.
+  puzzleId     String?
+  prizeTitle   String?
+  /// Order total in minor units of the shop's currency. An integer because
+  /// these are summed, and floating-point money drifts.
+  totalCents   Int
+  currency     String
+  /// Set when the order is cancelled, rather than deleting the row: a merchant
+  /// comparing this month against last needs cancellations to stop counting
+  /// without the history quietly changing shape underneath them.
+  cancelled    Boolean  @default(false)
+  orderedAt    DateTime
+  createdAt    DateTime @default(now())
+
+  /// Shopify redelivers webhooks, so the same order arrives more than once.
+  /// The upsert against this index is what makes a repeat delivery a no-op
+  /// instead of double-counting the sale.
+  @@unique([shopDomain, orderId])
+  @@index([shopDomain, orderedAt])
 }

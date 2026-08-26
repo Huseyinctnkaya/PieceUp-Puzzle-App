@@ -10,7 +10,14 @@ beforeEach(async () => {
 });
 
 function play(limit: "ONCE_EVER" | "ONCE_PER_DAY" | "UNLIMITED") {
-  return recordCompletion(SHOP, SHOPPER, "PIECEUP-X", "Prize", limit);
+  return recordCompletion({
+    shopDomain: SHOP,
+    identityKey: SHOPPER,
+    puzzleId: "puzzle-1",
+    discountCode: "PIECEUP-X",
+    prizeTitle: "Prize",
+    playLimitType: limit,
+  });
 }
 
 describe("play limits", () => {
