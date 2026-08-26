@@ -369,8 +369,7 @@ export default function Dashboard() {
                     alignItems="center"
                   >
                     <s-icon type="email" />
-                    {/* TODO: swap in the real support address once we have one */}
-                    <s-link href="mailto:destek@example.com">
+                    <s-link href="mailto:info@34devs.com">
                       <s-text type="strong">Email support</s-text>
                     </s-link>
                   </s-stack>

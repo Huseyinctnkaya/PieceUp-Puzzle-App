@@ -111,4 +111,4 @@ merchants through the app.
 
 ## Contact
 
-34devs — [destek@34devs.com](mailto:destek@34devs.com)
+34devs — [info@34devs.com](mailto:info@34devs.com)
