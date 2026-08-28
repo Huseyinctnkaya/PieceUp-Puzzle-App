@@ -13,7 +13,11 @@ import {
 } from "../models/puzzleConfig.server";
 import { getSubscription } from "../services/billing.server";
 import type { action as uploadAction } from "./app.upload";
-import { rejectionFor, uploadErrorMessage } from "../lib/uploadLimits";
+import {
+  rejectionFor,
+  uploadErrorMessage,
+  uploadHint,
+} from "../lib/uploadLimits";
 import { PuzzlePreview } from "../components/PuzzlePreview";
 import { reorder } from "../lib/reorder";
 import {
@@ -522,6 +526,7 @@ export default function PuzzleEdit() {
                     </s-stack>
                   ) : null}
                 </s-drop-zone>
+                <s-text color="subdued">{uploadHint()}</s-text>
               </s-section>
 
               <s-section heading="Settings">

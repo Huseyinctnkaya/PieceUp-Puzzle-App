@@ -27,8 +27,35 @@ export const UPLOAD_ERROR_CODES = [
 
 export type UploadErrorCode = (typeof UPLOAD_ERROR_CODES)[number];
 
+/**
+ * The width worth uploading, in pixels.
+ *
+ * The storefront board is capped at 620px wide by `.tahta` in the widget's
+ * stylesheet — 590px or so once a side tray takes its share. Double that for
+ * retina and anything beyond is bytes the shopper waits on for no visible
+ * gain.
+ */
+export const RECOMMENDED_IMAGE_PX = 1200;
+
 /** "10 MB" — derived, so the message cannot drift from the limit it states. */
 const LIMIT_LABEL = `${Math.round(MAX_UPLOAD_BYTES / (1024 * 1024))} MB`;
+
+/**
+ * The line under the image picker, telling a merchant what to upload before
+ * they upload the wrong thing.
+ *
+ * The shape warning earns its place: the board keeps the image's aspect ratio,
+ * so a portrait screenshot makes a puzzle that runs down the whole storefront
+ * page. Merchants hit this and read it as the app being broken, and a pixel
+ * count on its own would not have warned them.
+ */
+export function uploadHint(): string {
+  return (
+    `Recommended ${RECOMMENDED_IMAGE_PX} × ${RECOMMENDED_IMAGE_PX} px. ` +
+    `Square or landscape works best — a tall image makes a tall puzzle on ` +
+    `your storefront. JPG, PNG or WebP, up to ${LIMIT_LABEL}.`
+  );
+}
 
 /**
  * Why this file can't be uploaded, or null when it can.

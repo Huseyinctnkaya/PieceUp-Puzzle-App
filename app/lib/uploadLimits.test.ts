@@ -1,9 +1,11 @@
 import { describe, it, expect } from "vitest";
 import {
   MAX_UPLOAD_BYTES,
+  RECOMMENDED_IMAGE_PX,
   UPLOAD_ERROR_CODES,
   rejectionFor,
   uploadErrorMessage,
+  uploadHint,
 } from "./uploadLimits";
 
 function fileOf(bytes: number, type: string) {
@@ -40,6 +42,23 @@ describe("rejectionFor", () => {
     expect(rejectionFor(fileOf(MAX_UPLOAD_BYTES + 1, "application/pdf"))).toBe(
       "file_too_large",
     );
+  });
+});
+
+describe("uploadHint", () => {
+  it("states the recommended dimensions", () => {
+    expect(uploadHint()).toContain(String(RECOMMENDED_IMAGE_PX));
+  });
+
+  it("states the size limit, so a merchant learns it before being refused", () => {
+    expect(uploadHint()).toContain("10 MB");
+  });
+
+  it("warns that a tall image makes a tall puzzle", () => {
+    // The board keeps the image's aspect ratio, so a portrait screenshot
+    // stretches the puzzle down the storefront page. That is the mistake the
+    // hint exists to prevent, and pixels alone do not prevent it.
+    expect(uploadHint()).toMatch(/tall/i);
   });
 });
 
