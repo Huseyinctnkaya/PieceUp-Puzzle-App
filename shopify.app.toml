@@ -109,9 +109,4 @@ subpath = "pieceup"
 
 [build]
 include_config_on_deploy = true
-# False now that application_url points at the real domain. Left true, the next
-# `shopify app dev` would silently rewrite application_url and redirect_urls to
-# its throwaway tunnel and push that to Shopify — every merchant's admin would
-# then load the app from a tunnel that dies with the dev session. With it off
-# the CLI asks first, so a local session can no longer clobber production.
-automatically_update_urls_on_dev = false
+automatically_update_urls_on_dev = true
