@@ -13,6 +13,18 @@ import type { Plan } from "../lib/plans";
  */
 export const PLAN_CACHE_TTL_MS = 5 * 60 * 1000;
 
+/**
+ * How much longer an expired entry may still be served while the Admin API is
+ * refusing to answer.
+ *
+ * Without a bound, a failing lookup would keep returning the same expired plan
+ * for as long as the outage lasted, because nothing refreshes or evicts it —
+ * a shop that downgraded would hold its old plan indefinitely. An hour rides
+ * out any transient failure while capping how far the cache can drift from the
+ * truth at one hour plus the TTL.
+ */
+export const STALE_GRACE_MS = 60 * 60 * 1000;
+
 type Entry = { plan: Plan; expires: number };
 
 // Per-process, which is the right scope for this: it is a cache, not state, so
@@ -34,9 +46,10 @@ export function clearPlanCache() {
  * limit on an answer that barely ever changes.
  *
  * Returns null when the plan genuinely cannot be determined — a first lookup
- * that failed, with nothing cached to fall back on. Callers must treat that as
- * "unknown" rather than as Free: reading it as Free is what would put our
- * badge on a paying merchant's storefront over a transient API error.
+ * that failed with nothing cached, or a failure that has now outlasted
+ * STALE_GRACE_MS. Callers must treat that as "unknown" rather than as Free:
+ * reading it as Free is what would put our badge on a paying merchant's
+ * storefront over a transient API error.
  */
 export async function getCachedPlan(
   shopDomain: string,
@@ -51,8 +64,12 @@ export async function getCachedPlan(
     return plan;
   } catch (error) {
     console.warn("[PieceUp] could not read the shop's plan:", error);
-    // A stale answer beats a wrong one. `hit` here is expired but was true
-    // within the last TTL, which is far closer to the truth than a guess.
-    return hit?.plan ?? null;
+    // A recently stale answer beats a guess, so an expired entry still serves
+    // for the grace window. Past that the outage has lasted long enough that
+    // the entry is no longer evidence of anything: drop it and report unknown,
+    // which callers already read as "no badge".
+    if (hit && Date.now() < hit.expires + STALE_GRACE_MS) return hit.plan;
+    cache.delete(shopDomain);
+    return null;
   }
 }

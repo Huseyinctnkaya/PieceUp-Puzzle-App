@@ -5,9 +5,12 @@ vi.mock("./billing.server", () => ({
   getSubscription: (...args: unknown[]) => getSubscription(...args),
 }));
 
-const { getCachedPlan, clearPlanCache, PLAN_CACHE_TTL_MS } = await import(
-  "./planCache.server"
-);
+const {
+  getCachedPlan,
+  clearPlanCache,
+  PLAN_CACHE_TTL_MS,
+  STALE_GRACE_MS,
+} = await import("./planCache.server");
 
 const SHOP = "shop-cache.myshopify.com";
 const admin = {} as never;
@@ -73,10 +76,30 @@ describe("getCachedPlan", () => {
   it("falls back to a stale entry when the lookup fails", async () => {
     // A transient Admin API error must not make a paying merchant's storefront
     // suddenly wear our badge. The last known answer is far better than a
-    // wrong one, and it is at most one TTL old.
+    // wrong one, and STALE_GRACE_MS bounds how far behind it can fall.
     await getCachedPlan(SHOP, admin);
     vi.advanceTimersByTime(PLAN_CACHE_TTL_MS + 1);
     getSubscription.mockRejectedValueOnce(new Error("429 throttled"));
+
+    expect(await getCachedPlan(SHOP, admin)).toBe(PRO);
+  });
+
+  it("stops trusting a stale entry once the outage outlasts the grace window", async () => {
+    // Without a bound the entry is never refreshed and never evicted, so a
+    // shop that downgraded would keep its old plan for as long as the Admin
+    // API stayed down. Falling back to null costs a free shop its badge for
+    // the duration; keeping a stale Pro costs us the badge indefinitely.
+    await getCachedPlan(SHOP, admin);
+    getSubscription.mockRejectedValue(new Error("sustained outage"));
+    vi.advanceTimersByTime(PLAN_CACHE_TTL_MS + STALE_GRACE_MS + 1);
+
+    expect(await getCachedPlan(SHOP, admin)).toBeNull();
+  });
+
+  it("still serves a stale entry inside the grace window", async () => {
+    await getCachedPlan(SHOP, admin);
+    getSubscription.mockRejectedValue(new Error("429 throttled"));
+    vi.advanceTimersByTime(PLAN_CACHE_TTL_MS + STALE_GRACE_MS - 1);
 
     expect(await getCachedPlan(SHOP, admin)).toBe(PRO);
   });
