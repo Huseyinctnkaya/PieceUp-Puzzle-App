@@ -104,13 +104,19 @@ redirect_urls = [ "https://piece-up.app/api/auth" ]
 
 # Where the admin's "App settings" link on the app's card sends a merchant.
 #
+# Deliberately the app home rather than a settings page of its own. Everything
+# configurable belongs to a puzzle — how the popup opens, which pages it shows
+# on, how often a shopper can play — and a shop with two puzzles needs two
+# answers, not one shared screen. The only shop-wide setting there is, the
+# theme app embed confirmation, already lives in the home page's setup guide.
+#
 # Declared here rather than left to the Dev Dashboard: the dashboard had it
-# pointing at a route that was never built, and App Store review rejected the
-# bare 404 it produced (requirement 2.1.3 — no web errors). Deploying the
-# config overwrites whatever the dashboard holds, so this file is now the
-# authority. If the route ever moves, both have to move together.
+# pointing at /app/settings, a route that was never built, and App Store review
+# rejected the bare 404 it produced (requirement 2.1.3 — no web errors).
+# Deploying the config overwrites whatever the dashboard holds, so this file is
+# the authority and the two can't drift apart again.
 [app_preferences]
-url = "https://piece-up.app/app/settings"
+url = "https://piece-up.app/app"
 
 [app_proxy]
 url = "https://piece-up.app/apps/pieceup"
