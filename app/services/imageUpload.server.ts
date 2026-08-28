@@ -1,10 +1,8 @@
 import type { AdminApiContext } from "@shopify/shopify-app-react-router/server";
+import { rejectionFor } from "../lib/uploadLimits";
 
 /** The shape Shopify returns for GraphQL userErrors. */
 type UserError = { field?: string[] | null; message: string };
-
-const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
-const ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 const STAGED_UPLOADS_CREATE = `#graphql
   mutation stagedUploadsCreate($input: [StagedUploadInput!]!) {
@@ -47,11 +45,12 @@ export async function uploadPuzzleImage(
   admin: AdminApiContext,
   file: File,
 ): Promise<string> {
-  if (file.size > MAX_FILE_SIZE_BYTES) {
-    throw new Error("file_too_large");
-  }
-  if (!ALLOWED_MIME_TYPES.includes(file.type)) {
-    throw new Error("unsupported_file_type");
+  // The browser checks this too, so a merchant hears about it without waiting
+  // for the file to travel. Repeated here because the browser's check is a
+  // courtesy, not a guarantee — this endpoint is reachable without it.
+  const rejection = rejectionFor(file);
+  if (rejection) {
+    throw new Error(rejection);
   }
 
   const stagedResponse = await admin.graphql(STAGED_UPLOADS_CREATE, {

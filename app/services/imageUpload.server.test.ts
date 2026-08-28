@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { AdminApiContext } from "@shopify/shopify-app-react-router/server";
 import { uploadPuzzleImage } from "./imageUpload.server";
+import { MAX_UPLOAD_BYTES } from "../lib/uploadLimits";
 
 function jsonResponse(data: unknown) {
   return { json: async () => ({ data }) } as Response;
@@ -69,11 +70,15 @@ describe("uploadPuzzleImage", () => {
     ).rejects.toThrow("Staged upload failed");
   });
 
-  it("throws without calling the network when the file exceeds 5MB", async () => {
+  it("throws without calling the network when the file exceeds the limit", async () => {
     const admin = { graphql: vi.fn() };
-    const oversized = new File([new Uint8Array(6 * 1024 * 1024)], "big.jpg", {
-      type: "image/jpeg",
-    });
+    // Sized from the constant rather than a literal, so raising the limit
+    // cannot leave this test quietly asserting the old one.
+    const oversized = new File(
+      [new Uint8Array(MAX_UPLOAD_BYTES + 1)],
+      "big.jpg",
+      { type: "image/jpeg" },
+    );
     await expect(
       uploadPuzzleImage(admin as unknown as AdminApiContext, oversized),
     ).rejects.toThrow("file_too_large");

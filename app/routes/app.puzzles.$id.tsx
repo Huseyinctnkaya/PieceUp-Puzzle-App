@@ -13,6 +13,7 @@ import {
 } from "../models/puzzleConfig.server";
 import { getSubscription } from "../services/billing.server";
 import type { action as uploadAction } from "./app.upload";
+import { rejectionFor, uploadErrorMessage } from "../lib/uploadLimits";
 import { PuzzlePreview } from "../components/PuzzlePreview";
 import { reorder } from "../lib/reorder";
 import {
@@ -273,6 +274,15 @@ export default function PuzzleEdit() {
     });
   }
 
+  // Read before the effect narrows the union: inside the `imageUrl` branch's
+  // else, TypeScript has already ruled the error shape out entirely.
+  const serverUploadError =
+    uploadFetcher.data &&
+    typeof uploadFetcher.data === "object" &&
+    "error" in uploadFetcher.data
+      ? uploadErrorMessage(String(uploadFetcher.data.error))
+      : undefined;
+
   useEffect(() => {
     if (
       uploadFetcher.data &&
@@ -281,14 +291,10 @@ export default function PuzzleEdit() {
     ) {
       const uploaded = uploadFetcher.data.imageUrl;
       setForm((prev) => ({ ...prev, imageUrl: uploaded }));
-    } else if (
-      uploadFetcher.data &&
-      typeof uploadFetcher.data === "object" &&
-      "error" in uploadFetcher.data
-    ) {
-      shopify.toast.show("Couldn’t upload the image", { isError: true });
+    } else if (serverUploadError) {
+      shopify.toast.show(serverUploadError, { isError: true });
     }
-  }, [uploadFetcher.data, shopify]);
+  }, [uploadFetcher.data, serverUploadError, shopify]);
 
   useEffect(() => {
     if (!saveFetcher.data || typeof saveFetcher.data !== "object") return;
@@ -318,15 +324,27 @@ export default function PuzzleEdit() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [saveFetcher.data, shopify, isNew, navigate]);
 
-  const uploadError =
-    uploadFetcher.data &&
-    typeof uploadFetcher.data === "object" &&
-    "error" in uploadFetcher.data
-      ? String(uploadFetcher.data.error)
-      : undefined;
+  // Set when the browser turns a file away before sending it, so the drop zone
+  // can explain itself without a round trip.
+  const [localUploadError, setLocalUploadError] = useState<string | null>(null);
+
+  const uploadError = localUploadError ?? serverUploadError;
 
   function uploadFile(file: File | undefined) {
     if (!file) return;
+    // Checked before sending so an oversized file never leaves the merchant's
+    // machine: they hear about it immediately rather than after the upload,
+    // and the request never reaches nginx's body limit, which answers a bare
+    // 413 that no part of this app would get to dress up.
+    const rejection = rejectionFor(file);
+    if (rejection) {
+      const message = uploadErrorMessage(rejection);
+      setLocalUploadError(message);
+      shopify.toast.show(message, { isError: true });
+      return;
+    }
+    setLocalUploadError(null);
+
     const formData = new FormData();
     formData.append("image", file);
     uploadFetcher.submit(formData, {
