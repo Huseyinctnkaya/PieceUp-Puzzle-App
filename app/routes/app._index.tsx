@@ -395,8 +395,7 @@ export default function Dashboard() {
                     alignItems="center"
                   >
                     <s-icon type="book-open" />
-                    {/* TODO: swap in the real docs URL once we have one */}
-                    <s-link href="#">
+                    <s-link href="/app/docs">
                       <s-text type="strong">Documentation</s-text>
                     </s-link>
                   </s-stack>
