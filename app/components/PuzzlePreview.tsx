@@ -181,6 +181,23 @@ function usePuzzleMount(settings: PreviewSettings, open: boolean) {
     const container = document.createElement("div");
     shadow.appendChild(container);
 
+    // The reward panel's shop button is a real link to the storefront. In the
+    // admin it has nowhere to go — the embedded app is not the shop — so
+    // following it drops the merchant on a 404. It still belongs in the
+    // preview, since it is part of what a shopper will see; it just must not be
+    // followed. Captured, so it is stopped before the anchor acts, and on click
+    // rather than pointer events, so activating it from the keyboard — which
+    // fires a click of its own — goes nowhere either.
+    container.addEventListener(
+      "click",
+      (event) => {
+        if ((event.target as HTMLElement | null)?.closest(".odul-buton")) {
+          event.preventDefault();
+        }
+      },
+      true,
+    );
+
     // Loaded on demand: the bundle is only needed when a merchant asks to see
     // the puzzle, and it is not small enough to spend on every page load.
     //
