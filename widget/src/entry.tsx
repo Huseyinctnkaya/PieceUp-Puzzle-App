@@ -13,6 +13,7 @@ import {
 } from "./components/PuzzleKampanya";
 import { PuzzleHediyeKarti } from "./components/PuzzleHediyeKarti";
 import type { Props } from "./components/PuzzleKampanya/types";
+import type { Props as GiftProps } from "./components/PuzzleHediyeKarti/types";
 
 export type PieceUpGift = {
   title: string;
@@ -50,7 +51,9 @@ export type PieceUpConfig = {
    * and it is 144px the puzzle could be using instead.
    */
   compact?: boolean | null;
-  /** Reward panel copy. Defaults read as a Turkish storefront, like the rest. */
+  /** The button a shopper presses to reveal the pieces and start playing. */
+  startButtonLabel?: string | null;
+  /** Reward panel copy. Falls back to the English defaults below. */
   rewardHeading?: string | null;
   rewardBody?: string | null;
   noPrizeHeading?: string | null;
@@ -88,6 +91,44 @@ function gridFor(pieceCount: number) {
   return { rows, cols: Math.ceil(pieceCount / rows) };
 }
 
+/**
+ * Every string a shopper reads, in English.
+ *
+ * The reference components carry a Turkish fallback for each of these. They are
+ * not edited in place: their props are declared in an auto-generated types.ts,
+ * and the components themselves are meant to be carried over unmodified — so
+ * the copy is passed in from this side of the boundary instead, which leaves
+ * those fallbacks in the bundle but unreachable.
+ *
+ * The {placeholders} are filled in by the reference and must keep their names.
+ */
+const COPY = {
+  sifirlaButonMetni: "Shuffle again",
+  karistirmaHakkiMetni: "Shuffle again ({kalan})",
+  hakBittiMetni: "No shuffles left",
+  sureDolduBasligi: "Time is up",
+  tekrarDeneButonMetni: "Try again",
+  yenidenBaslaButonMetni: "Play again",
+  hediyeBasligi: "Choose your gift",
+  kopyalaButonMetni: "Copy code",
+  kopyalandiMetni: "Copied!",
+  tepsiTamamlandiMetni: "All pieces placed",
+  kutuKilitliMetni: "You already opened a box this round",
+  hediyeKullanildiMetni: "You already took this gift",
+  gorselYokMetni: "No puzzle image selected.",
+  // Read out by screen readers rather than shown, but no less part of the copy.
+  parcaAlEtiketi: "Puzzle piece {no}",
+  slotEtiketi: "Piece slot {no}",
+} satisfies Partial<Props>;
+
+/** The same, for the gift cards, whose props are the other component's. */
+const GIFT_COPY = {
+  secimButonMetni: "Choose this gift",
+  secildiButonMetni: "Selected",
+  kutuKapakMetni: "Surprise box",
+  kutuAcMetni: "Open the box",
+} satisfies Partial<GiftProps>;
+
 export type PuzzleHandle = {
   /** Fills in the coupon the reward panel shows, once the server has minted it. */
   setRewardCode(code: string): void;
@@ -124,6 +165,7 @@ export function mountPuzzle(
     onHediyeSecildi?: (giftIndex: number) => void;
     yarimIlerlemeyiHatirla?: boolean;
   } = {
+    ...COPY,
     ustEtiket: config.badgeLabel ?? undefined,
     baslik: config.headline ?? "",
     aciklama: config.description ?? undefined,
@@ -139,6 +181,10 @@ export function mountPuzzle(
     sureLimitiAktif: Boolean(config.timeLimitSeconds),
     sureSaniye: config.timeLimitSeconds ?? 120,
     hamleSayaciniGoster: true,
+    // Passed from here rather than left to the reference component's fallback,
+    // which is Turkish. Every other piece of chrome a shopper reads before
+    // playing is English, so the start button should not be the exception.
+    baslaButonMetni: config.startButtonLabel ?? "Start puzzle",
     ilerlemeyiHatirla: config.rememberProgress ?? true,
     // A won reward is worth coming back to — closing the popup should not cost
     // a shopper their code. A half-dragged puzzle is not: reopening on a
@@ -157,6 +203,7 @@ export function mountPuzzle(
     hediyeKartlari: (config.gifts ?? []).map((gift) => ({
       component: PuzzleHediyeKarti,
       props: {
+        ...GIFT_COPY,
         hediyeBasligi: gift.title,
         hediyeAciklamasi: gift.description ?? undefined,
         rozetMetni: gift.badgeLabel ?? undefined,
@@ -198,17 +245,17 @@ export function mountPuzzle(
           kuponKodunuGoster={won}
           odulBasligi={
             won
-              ? (config.rewardHeading ?? "Tebrikler, kazandın!")
-              : (config.noPrizeHeading ?? "Bu sefer olmadı")
+              ? (config.rewardHeading ?? "Congratulations, you won!")
+              : (config.noPrizeHeading ?? "Not this time")
           }
           odulAciklamasi={
             won
               ? (config.rewardBody ??
-                "Aşağıdaki kodu sepetinde kullanarak indirimini alabilirsin.")
-              : (config.noPrizeBody ?? "Bir dahaki sefere bol şans!")
+                "Use the code below in your cart to claim your discount.")
+              : (config.noPrizeBody ?? "Better luck next time!")
           }
           odulButonMetni={
-            won ? (config.shopButtonLabel ?? "Alışverişe başla") : undefined
+            won ? (config.shopButtonLabel ?? "Start shopping") : undefined
           }
           odulBaglantisi={{ href: config.shopUrl ?? "/collections/all" }}
         />

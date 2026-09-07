@@ -91,9 +91,9 @@ describe("the round trip", () => {
 
   it("gives back exactly what was saved", () => {
     const draft: GiftDraft = {
-      title: "Kargo Bedava",
-      description: "Siparişinde ücretsiz kargo",
-      badgeLabel: "Popüler",
+      title: "Free Shipping",
+      description: "Free shipping on your order",
+      badgeLabel: "Popular",
       imageUrl: "",
       discountType: "FREE_SHIPPING",
       discountValue: "10",

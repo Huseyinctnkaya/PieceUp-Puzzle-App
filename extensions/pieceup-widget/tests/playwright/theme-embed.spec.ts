@@ -115,7 +115,7 @@ test("congratulates a winner and offers the code and a way to spend it", async (
 }) => {
   await finishWith(page, { title: "20% off", awardsPrize: true }, "PUZZLE20");
 
-  await expect(page.locator(".odul-baslik")).toContainText("Tebrikler");
+  await expect(page.locator(".odul-baslik")).toContainText("Congratulations");
   await expect(page.locator(".kupon-kodu")).toHaveText("PUZZLE20");
   await expect(page.locator(".odul-buton")).toHaveCount(1);
 });
@@ -125,7 +125,7 @@ test("does not congratulate a shopper who won nothing", async ({ page }) => {
 
   // Congratulating someone on a "try again" reads as a broken prize, and a
   // shop button invites them to spend on the strength of having won nothing.
-  await expect(page.locator(".odul-baslik")).not.toContainText("Tebrikler");
+  await expect(page.locator(".odul-baslik")).not.toContainText("Congratulations");
   await expect(page.locator(".odul-buton")).toHaveCount(0);
   await expect(page.locator(".kupon-kodu")).toHaveCount(0);
 });
